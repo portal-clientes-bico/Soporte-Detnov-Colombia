@@ -6,6 +6,7 @@ type Contexto = Awaited<ReturnType<typeof getContextoChatbot>>;
 type ProductoCtx = Contexto["productos"][number];
 type DocumentoCtx = Contexto["documentosConfirmados"][number];
 type PreguntaCtx = Contexto["preguntasCerradas"][number];
+type PaginaCtx = NonNullable<DocumentoCtx["paginas"]>[number];
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
@@ -65,7 +66,52 @@ function documentoRelevante(d: DocumentoCtx, palabras: string[], referenciasRele
   if (coincideAlgunaPalabra(d.codigo, palabras)) return true;
   if (coincideAlgunaPalabra(d.notas, palabras)) return true;
   if (coincideAlgunaPalabra(d.tipo, palabras)) return true;
-  return d.referencias.some((r) => referenciasRelevantes.has(r));
+  if (d.referencias.some((r) => referenciasRelevantes.has(r))) return true;
+  // Ademas de la metadata, busca dentro del texto extraido del PDF (si lo tiene): un
+  // documento cuyo titulo no menciona la palabra clave pero cuyo contenido si, tambien debe
+  // considerarse relevante.
+  return (d.paginas ?? []).some((p) => coincideAlgunaPalabra(p.texto, palabras));
+}
+
+/** Limite de caracteres de texto extraido incluidos por documento en el prompt, para que un
+ * manual largo no dispare el consumo de tokens de una sola pregunta. */
+const MAX_CHARS_TEXTO_POR_DOCUMENTO = 6000;
+/** Maximo de paginas coincidentes a incluir por documento, aun si caben en el limite de
+ * caracteres -- evita mandar decenas de paginas sueltas de un manual muy repetitivo. */
+const MAX_PAGINAS_COINCIDENTES = 6;
+
+interface FragmentoTexto {
+  paginas: PaginaCtx[];
+  modo: "coincidencia" | "resumen" | "ninguno";
+  paginasOmitidas: number;
+}
+
+/**
+ * Elige que paginas del texto extraido de un documento incluir en el prompt: primero las
+ * que contienen alguna palabra clave de la pregunta (lo mas util), acotado por cantidad de
+ * paginas y de caracteres; si ninguna pagina coincide (el documento es relevante por su
+ * titulo/notas o por estar vinculado a una referencia relevante, no por su contenido) se
+ * incluyen las primeras paginas a modo de resumen, tambien acotadas.
+ */
+function seleccionarFragmento(d: DocumentoCtx, palabras: string[]): FragmentoTexto {
+  const todasLasPaginas = d.paginas ?? [];
+  if (todasLasPaginas.length === 0) return { paginas: [], modo: "ninguno", paginasOmitidas: 0 };
+
+  const coincidentes = palabras.length > 0 ? todasLasPaginas.filter((p) => coincideAlgunaPalabra(p.texto, palabras)) : [];
+  const candidatas = coincidentes.length > 0 ? coincidentes : todasLasPaginas;
+  const modo: FragmentoTexto["modo"] = coincidentes.length > 0 ? "coincidencia" : "resumen";
+
+  const elegidas: PaginaCtx[] = [];
+  let caracteres = 0;
+  for (const pagina of candidatas.slice(0, MAX_PAGINAS_COINCIDENTES)) {
+    if (caracteres >= MAX_CHARS_TEXTO_POR_DOCUMENTO) break;
+    const restante = MAX_CHARS_TEXTO_POR_DOCUMENTO - caracteres;
+    const texto = pagina.texto.length > restante ? `${pagina.texto.slice(0, restante)}...` : pagina.texto;
+    elegidas.push({ numero: pagina.numero, texto });
+    caracteres += texto.length;
+  }
+
+  return { paginas: elegidas, modo, paginasOmitidas: candidatas.length - elegidas.length };
 }
 
 function preguntaRelevante(p: PreguntaCtx, palabras: string[], referenciasRelevantes: Set<string>): boolean {
@@ -76,6 +122,7 @@ function preguntaRelevante(p: PreguntaCtx, palabras: string[], referenciasReleva
 }
 
 interface ContextoFiltrado {
+  palabras: string[];
   productosRelevantes: ProductoCtx[];
   productosIndice: { referencia: string; nombre: string }[];
   documentosRelevantes: DocumentoCtx[];
@@ -95,6 +142,7 @@ export function filtrarContexto(pregunta: string, contexto: Contexto): ContextoF
   // sentido, se manda el indice compacto de todo y el detalle completo de nada puntual.
   if (palabras.length === 0) {
     return {
+      palabras,
       productosRelevantes: [],
       productosIndice: contexto.productos.map((p) => ({ referencia: p.referencia, nombre: p.nombre })),
       documentosRelevantes: [],
@@ -118,6 +166,7 @@ export function filtrarContexto(pregunta: string, contexto: Contexto): ContextoF
   const preguntasRelevantes = preguntasRelevantesTodas.slice(0, MAX_RELEVANTES);
 
   return {
+    palabras,
     productosRelevantes,
     productosIndice,
     documentosRelevantes,
@@ -152,7 +201,7 @@ function formatearProductosIndice(indice: { referencia: string; nombre: string }
   return indice.map((p) => `${p.referencia} (${p.nombre})`).join(", ");
 }
 
-function formatearDocumentos(documentos: DocumentoCtx[]): string {
+function formatearDocumentos(documentos: DocumentoCtx[], palabras: string[]): string {
   if (documentos.length === 0) return "(ningun documento confirmado parecio relevante para esta pregunta)";
   return documentos
     .map((d) => {
@@ -161,6 +210,18 @@ function formatearDocumentos(documentos: DocumentoCtx[]): string {
       if (d.fuente) partes.push(`  Fuente: ${d.fuente}`);
       if (d.referencias.length > 0) partes.push(`  Referencias: ${d.referencias.join(", ")}`);
       if (d.notas) partes.push(`  Notas: ${d.notas}`);
+
+      const fragmento = seleccionarFragmento(d, palabras);
+      if (fragmento.paginas.length === 0) {
+        partes.push("  Contenido del archivo: no disponible (no se pudo extraer texto, o es un archivo sin descargar/tipo no soportado)");
+      } else {
+        const encabezado = fragmento.modo === "coincidencia" ? "Fragmentos del archivo que mencionan la pregunta" : "Extracto inicial del archivo (su contenido no coincidio con palabras clave puntuales)";
+        partes.push(`  ${encabezado}:`);
+        for (const pagina of fragmento.paginas) {
+          partes.push(`    [pagina ${pagina.numero}] ${pagina.texto.replace(/\n+/g, " ").trim()}`);
+        }
+        if (fragmento.paginasOmitidas > 0) partes.push(`    (hay ${fragmento.paginasOmitidas} pagina(s) adicional(es) del mismo archivo no incluidas aqui por espacio)`);
+      }
       return partes.join("\n");
     })
     .join("\n");
@@ -184,7 +245,7 @@ function construirSystemPrompt(marcaNombre: string, filtrado: ContextoFiltrado):
   return [
     `Eres el asistente tecnico interno de Detnov Colombia para el soporte de la marca "${marcaNombre}".`,
     "Responde SOLO con base en la informacion suministrada abajo (referencias de producto, documentos con confianza CONFIRMADO, y preguntas de soporte ya cerradas con respuesta). No inventes especificaciones, precios ni referencias que no esten en esta informacion.",
-    "IMPORTANTE: lo que ves abajo es la metadata capturada en la base de conocimiento (titulos, tipos, notas breves de verificacion), NO el texto completo de los PDF/Excel originales -- la herramienta no extrae el contenido de esos archivos. Si una pregunta pide un dato tecnico puntual (un valor exacto, un procedimiento de cableado, una cifra) que no aparece explicitamente abajo, di que ese detalle no esta capturado en la base y que hay que abrir el documento original (menciona cual, por titulo) para confirmarlo -- no asumas que 'no esta' en el documento, solo que no esta en lo que tienes disponible.",
+    "IMPORTANTE: para cada documento confirmado abajo ves su metadata (titulo, tipo, notas) y, cuando la herramienta pudo extraer texto del archivo (hoy solo PDF; Excel, escaneados y archivos sin descargar no tienen texto extraido), tambien fragmentos reales de su contenido -- ya sea las paginas que mencionan la pregunta, o un extracto inicial si ninguna pagina coincidio puntualmente. No es el archivo completo: por espacio, solo se incluyen algunas paginas por documento. Si un dato puntual (un valor exacto, un procedimiento, una cifra) no aparece en los fragmentos incluidos, di que no esta capturado en lo que tienes disponible y que hay que abrir el documento original (menciona cual, por titulo) para confirmarlo -- no asumas que 'no existe' en el documento, solo que no esta en el fragmento que se te dio.",
     "Para reducir el consumo de tokens, solo se incluye el detalle completo de las referencias/documentos/preguntas que parecen relacionadas con esta pregunta especifica; el resto del catalogo de referencias aparece solo como una lista de nombres (sin detalle) para que sepas que existen.",
     "Si la informacion disponible no alcanza para responder con certeza, dilo explicitamente en vez de adivinar.",
     "Responde en español, de forma clara y tecnica, apta para un ingeniero.",
@@ -196,7 +257,7 @@ function construirSystemPrompt(marcaNombre: string, filtrado: ContextoFiltrado):
     indiceTexto ? `=== OTRAS REFERENCIAS EXISTENTES (solo nombre, sin detalle) ===\n${indiceTexto}` : "",
     "",
     "=== DOCUMENTOS CONFIRMADOS RELEVANTES ===",
-    formatearDocumentos(filtrado.documentosRelevantes),
+    formatearDocumentos(filtrado.documentosRelevantes, filtrado.palabras),
     filtrado.documentosOmitidos > 0 ? `(hay ${filtrado.documentosOmitidos} documento(s) confirmado(s) adicional(es) que no parecieron relacionados con esta pregunta y no se incluyeron)` : "",
     "",
     "=== PREGUNTAS DE SOPORTE CERRADAS RELEVANTES ===",

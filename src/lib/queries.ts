@@ -1,5 +1,6 @@
 import "server-only";
 import { leerDb } from "@/lib/db";
+import { leerTextoDocumento } from "@/lib/extraccion-texto";
 import type {
   Compatibilidad,
   Documento,
@@ -311,8 +312,10 @@ export async function getUsuarios() {
  * Reune el conocimiento con el que el ChatBot puede fundamentar una respuesta: productos
  * de la marca, documentos con confianza CONFIRMADO (nunca PROBABLE/PENDIENTE, que son
  * pistas sin verificar) y preguntas de soporte ya cerradas con respuesta (el conocimiento
- * "resuelto" del equipo). No incluye el contenido de los archivos en si (no hay extraccion
- * de texto de PDFs en la herramienta), solo la metadata capturada en la base.
+ * "resuelto" del equipo). Para los documentos que ya tienen texto extraido (ver
+ * src/lib/extraccion-texto.ts, hoy solo PDF) se incluye tambien ese texto por pagina, para
+ * que el filtro de relevancia del ChatBot pueda buscar dentro del contenido real del
+ * archivo y no solo en la metadata (titulo, notas, etc).
  */
 export async function getContextoChatbot(marcaId: string) {
   const db = await leerDb();
@@ -329,26 +332,30 @@ export async function getContextoChatbot(marcaId: string) {
       especificaciones: p.especificaciones,
     }));
 
-  const documentosConfirmados = db.documentos
-    .filter((d) => d.marcaId === marcaId && d.confianza === "CONFIRMADO")
-    .map((d) => {
-      const fuente = d.fuenteId ? (db.fuentes.find((f) => f.id === d.fuenteId) ?? null) : null;
-      const referencias = db.documentoProductos
-        .filter((dp) => dp.documentoId === d.id)
-        .map((dp) => db.productos.find((p) => p.id === dp.productoId)?.referencia)
-        .filter((r): r is string => !!r);
-      return {
-        titulo: d.titulo,
-        tipo: d.tipo,
-        codigo: d.codigo,
-        revision: d.revision,
-        fechaEmision: d.fechaEmision,
-        idioma: d.idioma,
-        notas: d.notas,
-        fuente: fuente?.nombre ?? null,
-        referencias,
-      };
-    });
+  const documentosConfirmados = await Promise.all(
+    db.documentos
+      .filter((d) => d.marcaId === marcaId && d.confianza === "CONFIRMADO")
+      .map(async (d) => {
+        const fuente = d.fuenteId ? (db.fuentes.find((f) => f.id === d.fuenteId) ?? null) : null;
+        const referencias = db.documentoProductos
+          .filter((dp) => dp.documentoId === d.id)
+          .map((dp) => db.productos.find((p) => p.id === dp.productoId)?.referencia)
+          .filter((r): r is string => !!r);
+        const extraido = d.textoExtraidoEn ? await leerTextoDocumento(d.id) : null;
+        return {
+          titulo: d.titulo,
+          tipo: d.tipo,
+          codigo: d.codigo,
+          revision: d.revision,
+          fechaEmision: d.fechaEmision,
+          idioma: d.idioma,
+          notas: d.notas,
+          fuente: fuente?.nombre ?? null,
+          referencias,
+          paginas: extraido?.paginas ?? null,
+        };
+      }),
+  );
 
   const preguntasCerradas = db.preguntas
     .filter((p) => p.marcaId === marcaId && p.estado === "CERRADA" && p.respuesta)
