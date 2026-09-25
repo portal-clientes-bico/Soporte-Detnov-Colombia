@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mutarDb, ahora } from "@/lib/db";
 import { getContextoChatbot, getMarcaPorSlug } from "@/lib/queries";
 import { chatbotPreguntaSchema } from "@/lib/schemas";
 import { ChatbotApiError, ChatbotConfigError, preguntarChatbot } from "@/lib/chatbot";
@@ -14,8 +15,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   const contexto = await getContextoChatbot(marca.id);
 
   try {
-    const respuesta = await preguntarChatbot(parsed.data.pregunta, marca.nombre, contexto);
-    return NextResponse.json({ ok: true, respuesta });
+    const { texto, uso } = await preguntarChatbot(parsed.data.pregunta, marca.nombre, contexto);
+
+    const usoAcumulado = await mutarDb((db) => {
+      db.usoChatbot.totalPreguntas += 1;
+      db.usoChatbot.totalInputTokens += uso.inputTokens;
+      db.usoChatbot.totalOutputTokens += uso.outputTokens;
+      db.usoChatbot.actualizadoEn = ahora();
+      return db.usoChatbot;
+    });
+
+    return NextResponse.json({ ok: true, respuesta: texto, uso: usoAcumulado });
   } catch (error) {
     if (error instanceof ChatbotConfigError) return NextResponse.json({ error: error.message }, { status: 400 });
     if (error instanceof ChatbotApiError) return NextResponse.json({ error: error.message }, { status: 502 });

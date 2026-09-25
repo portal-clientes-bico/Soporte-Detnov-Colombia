@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { UsoChatbot } from "@/lib/db";
 
 interface Turno {
   pregunta: string;
@@ -20,9 +21,10 @@ function separarFuentes(respuesta: string): { cuerpo: string; fuentes: string | 
   return { cuerpo: respuesta.slice(0, match).trim(), fuentes: respuesta.slice(match).trim() };
 }
 
-export default function ChatbotManager({ slug }: { slug: string }) {
+export default function ChatbotManager({ slug, usoInicial }: { slug: string; usoInicial: UsoChatbot }) {
   const [pregunta, setPregunta] = useState("");
   const [turnos, setTurnos] = useState<Turno[]>([]);
+  const [uso, setUso] = useState(usoInicial);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -39,6 +41,8 @@ export default function ChatbotManager({ slug }: { slug: string }) {
     });
     const data = await res.json().catch(() => ({}));
 
+    if (res.ok && data.uso) setUso(data.uso);
+
     setTurnos((prev) => {
       const copia = [...prev];
       copia[indice] = res.ok
@@ -48,12 +52,27 @@ export default function ChatbotManager({ slug }: { slug: string }) {
     });
   }
 
+  const totalTokens = uso.totalInputTokens + uso.totalOutputTokens;
+
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-zinc-600 dark:text-zinc-400">
         Pregunta en lenguaje natural sobre esta marca. El ChatBot responde solo con base en las referencias registradas, los documentos con confianza{" "}
         <span className="font-medium">confirmado</span> y las preguntas de soporte ya cerradas — y cita al final que uso.
       </p>
+
+      <div
+        className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400"
+        title="Conteo propio de uso dentro de esta herramienta, no el saldo real de la cuenta de Anthropic (eso solo se ve en console.anthropic.com)."
+      >
+        <span>
+          <span className="font-medium text-zinc-900 dark:text-zinc-50">{uso.totalPreguntas.toLocaleString("es-CO")}</span> pregunta(s) realizada(s)
+        </span>
+        <span>
+          <span className="font-medium text-zinc-900 dark:text-zinc-50">{totalTokens.toLocaleString("es-CO")}</span> tokens consumidos ({uso.totalInputTokens.toLocaleString("es-CO")} entrada · {uso.totalOutputTokens.toLocaleString("es-CO")} salida)
+        </span>
+        <span className="text-zinc-400 dark:text-zinc-500">Consumo estimado local, no el saldo de la cuenta</span>
+      </div>
 
       {turnos.length === 0 && (
         <p className="rounded-xl border border-dashed border-zinc-300 p-4 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">

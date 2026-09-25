@@ -186,6 +186,19 @@ export interface Usuario {
   updatedAt: string;
 }
 
+/**
+ * Contador acumulado de uso de la API de Claude desde el ChatBot. No es el saldo real de la
+ * cuenta de Anthropic (eso no tiene endpoint publico, solo se ve en console.anthropic.com):
+ * es un conteo propio de preguntas y tokens consumidos dentro de esta herramienta, para tener
+ * una idea del consumo. Global (no por marca), se incrementa en cada respuesta exitosa.
+ */
+export interface UsoChatbot {
+  totalPreguntas: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  actualizadoEn: string | null;
+}
+
 export interface Db {
   marcas: Marca[];
   fuentes: Fuente[];
@@ -198,6 +211,7 @@ export interface Db {
   preguntaProductos: PreguntaProducto[];
   preguntaDocumentos: PreguntaDocumento[];
   usuarios: Usuario[];
+  usoChatbot: UsoChatbot;
 }
 
 function dbVacia(): Db {
@@ -213,6 +227,7 @@ function dbVacia(): Db {
     preguntaProductos: [],
     preguntaDocumentos: [],
     usuarios: [],
+    usoChatbot: { totalPreguntas: 0, totalInputTokens: 0, totalOutputTokens: 0, actualizadoEn: null },
   };
 }
 
@@ -237,6 +252,7 @@ function normalizarDb(parcial: Partial<Db>): Db {
     preguntaProductos: parcial.preguntaProductos ?? vacia.preguntaProductos,
     preguntaDocumentos: parcial.preguntaDocumentos ?? vacia.preguntaDocumentos,
     usuarios: parcial.usuarios ?? vacia.usuarios,
+    usoChatbot: parcial.usoChatbot ?? vacia.usoChatbot,
   };
 }
 

@@ -268,7 +268,12 @@ function construirSystemPrompt(marcaNombre: string, filtrado: ContextoFiltrado):
     .join("\n");
 }
 
-export async function preguntarChatbot(pregunta: string, marcaNombre: string, contexto: Contexto): Promise<string> {
+export interface RespuestaChatbot {
+  texto: string;
+  uso: { inputTokens: number; outputTokens: number };
+}
+
+export async function preguntarChatbot(pregunta: string, marcaNombre: string, contexto: Contexto): Promise<RespuestaChatbot> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new ChatbotConfigError(
@@ -302,5 +307,10 @@ export async function preguntarChatbot(pregunta: string, marcaNombre: string, co
   const data = await res.json();
   const texto = Array.isArray(data.content) ? data.content.map((b: { type: string; text?: string }) => (b.type === "text" ? b.text : "")).join("") : "";
   if (!texto) throw new ChatbotApiError("La API de Claude no devolvio texto en la respuesta.");
-  return texto;
+
+  const uso = {
+    inputTokens: typeof data.usage?.input_tokens === "number" ? data.usage.input_tokens : 0,
+    outputTokens: typeof data.usage?.output_tokens === "number" ? data.usage.output_tokens : 0,
+  };
+  return { texto, uso };
 }

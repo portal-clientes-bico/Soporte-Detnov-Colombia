@@ -376,4 +376,10 @@ export async function getContextoChatbot(marcaId: string) {
   return { productos, documentosConfirmados, preguntasCerradas };
 }
 
+/** Contador acumulado de uso de la API del ChatBot (ver db.ts: UsoChatbot). */
+export async function getUsoChatbot() {
+  const db = await leerDb();
+  return db.usoChatbot;
+}
+
 export type { Compatibilidad };
