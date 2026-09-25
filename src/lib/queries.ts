@@ -1,0 +1,306 @@
+import "server-only";
+import { leerDb } from "@/lib/db";
+import type {
+  Compatibilidad,
+  Documento,
+  Fuente,
+  Hallazgo,
+  Marca,
+  Producto,
+  SoporteConfianza,
+  SoporteDocumentoTipo,
+  SoporteHallazgoEstado,
+  SoporteHallazgoTipo,
+  SoporteIdioma,
+  SoportePreguntaAsignado,
+  SoportePreguntaEstado,
+  SoportePreguntaPrioridad,
+  SoporteProductoEstado,
+} from "@/lib/db";
+
+export interface MarcaResumen extends Marca {
+  productos: number;
+  documentos: number;
+  fuentes: number;
+  hallazgosAbiertos: number;
+  preguntasAbiertas: number;
+}
+
+export async function getMarcas(): Promise<MarcaResumen[]> {
+  const db = await leerDb();
+  return db.marcas
+    .map((m) => ({
+      ...m,
+      productos: db.productos.filter((p) => p.marcaId === m.id).length,
+      documentos: db.documentos.filter((d) => d.marcaId === m.id).length,
+      fuentes: db.fuentes.filter((f) => f.marcaId === m.id).length,
+      hallazgosAbiertos: db.hallazgos.filter((h) => h.marcaId === m.id && h.estado === "ABIERTO").length,
+      preguntasAbiertas: db.preguntas.filter((p) => p.marcaId === m.id && p.estado === "ABIERTA").length,
+    }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+}
+
+export async function getMarcaPorSlug(slug: string): Promise<Marca | null> {
+  const db = await leerDb();
+  return db.marcas.find((m) => m.slug === slug) ?? null;
+}
+
+export interface FiltroProductos {
+  q?: string;
+  familia?: string;
+  estado?: SoporteProductoEstado;
+  generacion?: string;
+}
+
+export interface ProductoConConteo extends Producto {
+  _count: { documentos: number; hallazgos: number; preguntas: number };
+  precioListaBico: string | null;
+}
+
+const NOMBRE_ESPEC_PRECIO_BICO = "Precio distribucion BICO";
+
+export async function getProductosDeMarca(marcaId: string, filtro: FiltroProductos = {}): Promise<ProductoConConteo[]> {
+  const db = await leerDb();
+  const q = filtro.q?.trim().toLowerCase();
+  return db.productos
+    .filter((p) => p.marcaId === marcaId)
+    .filter((p) => !filtro.familia || p.familia === filtro.familia)
+    .filter((p) => !filtro.estado || p.estado === filtro.estado)
+    .filter((p) => !filtro.generacion || p.generacion === filtro.generacion)
+    .filter(
+      (p) =>
+        !q ||
+        p.referencia.toLowerCase().includes(q) ||
+        p.nombre.toLowerCase().includes(q) ||
+        (p.descripcion ?? "").toLowerCase().includes(q),
+    )
+    .map((p) => ({
+      ...p,
+      precioListaBico: p.especificaciones.find((e) => e.grupo === "COMERCIAL" && e.nombre === NOMBRE_ESPEC_PRECIO_BICO)?.valor.split(" · ")[0] ?? null,
+      _count: {
+        documentos: db.documentoProductos.filter((dp) => dp.productoId === p.id).length,
+        hallazgos: db.hallazgos.filter((h) => h.productoId === p.id).length,
+        preguntas: db.preguntaProductos.filter((pp) => pp.productoId === p.id).length,
+      },
+    }))
+    .sort((a, b) => a.familia.localeCompare(b.familia) || a.referencia.localeCompare(b.referencia));
+}
+
+export async function getResumenProductos(marcaId: string) {
+  const db = await leerDb();
+  const productos = db.productos.filter((p) => p.marcaId === marcaId);
+
+  const porFamilia = new Map<string, number>();
+  const porEstado = new Map<string, number>();
+  const generaciones = new Set<string>();
+
+  for (const p of productos) {
+    porFamilia.set(p.familia, (porFamilia.get(p.familia) ?? 0) + 1);
+    porEstado.set(p.estado, (porEstado.get(p.estado) ?? 0) + 1);
+    if (p.generacion) generaciones.add(p.generacion);
+  }
+
+  return {
+    porFamilia: [...porFamilia.entries()].map(([familia, total]) => ({ familia, total })),
+    porEstado: [...porEstado.entries()].map(([estado, total]) => ({ estado, total })),
+    generaciones: [...generaciones].sort(),
+  };
+}
+
+export async function getProductoDetalle(marcaId: string, id: string) {
+  const db = await leerDb();
+  const producto = db.productos.find((p) => p.id === id && p.marcaId === marcaId);
+  if (!producto) return null;
+
+  const documentos = db.documentoProductos
+    .filter((dp) => dp.productoId === id)
+    .map((dp) => {
+      const documento = db.documentos.find((d) => d.id === dp.documentoId);
+      if (!documento) return null;
+      const fuente = documento.fuenteId ? (db.fuentes.find((f) => f.id === documento.fuenteId) ?? null) : null;
+      return { documento: { ...documento, fuente } };
+    })
+    .filter((x): x is { documento: Documento & { fuente: Fuente | null } } => x !== null)
+    .sort((a, b) => a.documento.createdAt.localeCompare(b.documento.createdAt));
+
+  const compatiblesMap = new Map<
+    string,
+    { id: string; referencia: string; nombre: string; familia: string; nota: string | null; compatibilidadId: string }
+  >();
+  for (const c of db.compatibilidades) {
+    if (c.productoId === id) {
+      const compatible = db.productos.find((p) => p.id === c.compatibleId);
+      if (compatible) {
+        compatiblesMap.set(compatible.id, {
+          id: compatible.id,
+          referencia: compatible.referencia,
+          nombre: compatible.nombre,
+          familia: compatible.familia,
+          nota: c.nota,
+          compatibilidadId: c.id,
+        });
+      }
+    }
+    if (c.compatibleId === id) {
+      const origen = db.productos.find((p) => p.id === c.productoId);
+      if (origen && !compatiblesMap.has(origen.id)) {
+        compatiblesMap.set(origen.id, {
+          id: origen.id,
+          referencia: origen.referencia,
+          nombre: origen.nombre,
+          familia: origen.familia,
+          nota: c.nota,
+          compatibilidadId: c.id,
+        });
+      }
+    }
+  }
+
+  const hallazgos = db.hallazgos
+    .filter((h) => h.productoId === id)
+    .sort((a, b) => (a.estado === b.estado ? b.createdAt.localeCompare(a.createdAt) : a.estado.localeCompare(b.estado)));
+
+  const ordenPrioridad: Record<string, number> = { ALTA: 0, MEDIA: 1, BAJA: 2 };
+  const preguntas = db.preguntaProductos
+    .filter((pp) => pp.productoId === id)
+    .map((pp) => db.preguntas.find((p) => p.id === pp.preguntaId))
+    .filter((p): p is NonNullable<typeof p> => !!p)
+    .sort(
+      (a, b) =>
+        (a.estado === "ABIERTA" ? 0 : 1) - (b.estado === "ABIERTA" ? 0 : 1) ||
+        (ordenPrioridad[a.prioridad] ?? 9) - (ordenPrioridad[b.prioridad] ?? 9) ||
+        b.createdAt.localeCompare(a.createdAt),
+    );
+
+  return {
+    ...producto,
+    documentos,
+    compatibles: [...compatiblesMap.values()].sort((a, b) => a.referencia.localeCompare(b.referencia)),
+    hallazgos,
+    preguntas,
+  };
+}
+
+export interface FiltroDocumentos {
+  q?: string;
+  tipo?: SoporteDocumentoTipo;
+  idioma?: SoporteIdioma;
+  confianza?: SoporteConfianza;
+  fuenteId?: string;
+}
+
+export interface DocumentoConProductos extends Documento {
+  fuente: Fuente | null;
+  productos: { producto: Producto }[];
+}
+
+export async function getDocumentosDeMarca(marcaId: string, filtro: FiltroDocumentos = {}): Promise<DocumentoConProductos[]> {
+  const db = await leerDb();
+  const q = filtro.q?.trim().toLowerCase();
+
+  return db.documentos
+    .filter((d) => d.marcaId === marcaId)
+    .filter((d) => !filtro.tipo || d.tipo === filtro.tipo)
+    .filter((d) => !filtro.idioma || d.idioma === filtro.idioma)
+    .filter((d) => !filtro.confianza || d.confianza === filtro.confianza)
+    .filter((d) => !filtro.fuenteId || d.fuenteId === filtro.fuenteId)
+    .map((d) => {
+      const fuente = d.fuenteId ? (db.fuentes.find((f) => f.id === d.fuenteId) ?? null) : null;
+      const productos = db.documentoProductos
+        .filter((dp) => dp.documentoId === d.id)
+        .map((dp) => db.productos.find((p) => p.id === dp.productoId))
+        .filter((p): p is Producto => !!p)
+        .map((producto) => ({ producto }));
+      return { ...d, fuente, productos };
+    })
+    .filter(
+      (d) =>
+        !q ||
+        d.titulo.toLowerCase().includes(q) ||
+        (d.codigo ?? "").toLowerCase().includes(q) ||
+        (d.notas ?? "").toLowerCase().includes(q) ||
+        d.productos.some((p) => p.producto.referencia.toLowerCase().includes(q)),
+    )
+    .sort((a, b) => a.tipo.localeCompare(b.tipo) || a.titulo.localeCompare(b.titulo));
+}
+
+export async function getFuentesDeMarca(marcaId: string) {
+  const db = await leerDb();
+  return db.fuentes
+    .filter((f) => f.marcaId === marcaId)
+    .map((f) => ({ ...f, _count: { documentos: db.documentos.filter((d) => d.fuenteId === f.id).length } }))
+    .sort((a, b) => a.prioridad - b.prioridad || a.nombre.localeCompare(b.nombre));
+}
+
+export interface FiltroHallazgos {
+  tipo?: SoporteHallazgoTipo;
+  estado?: SoporteHallazgoEstado;
+}
+
+export async function getHallazgosDeMarca(marcaId: string, filtro: FiltroHallazgos = {}) {
+  const db = await leerDb();
+  return db.hallazgos
+    .filter((h) => h.marcaId === marcaId)
+    .filter((h) => !filtro.tipo || h.tipo === filtro.tipo)
+    .filter((h) => !filtro.estado || h.estado === filtro.estado)
+    .map((h) => ({ ...h, producto: h.productoId ? (db.productos.find((p) => p.id === h.productoId) ?? null) : null }))
+    .sort(
+      (a, b) =>
+        (a.estado ?? "").localeCompare(b.estado ?? "") || (a.tipo ?? "").localeCompare(b.tipo ?? "") || (a.createdAt ?? "").localeCompare(b.createdAt ?? "")
+    );
+}
+
+export interface FiltroPreguntas {
+  prioridad?: SoportePreguntaPrioridad;
+  estado?: SoportePreguntaEstado;
+  asignadoA?: SoportePreguntaAsignado;
+}
+
+const ORDEN_PRIORIDAD: Record<string, number> = { ALTA: 0, MEDIA: 1, BAJA: 2 };
+const ORDEN_ESTADO_PREGUNTA: Record<string, number> = { ABIERTA: 0, CERRADA: 1 };
+
+export async function getPreguntasDeMarca(marcaId: string, filtro: FiltroPreguntas = {}) {
+  const db = await leerDb();
+  return db.preguntas
+    .filter((p) => p.marcaId === marcaId)
+    .map((p) => ({ ...p, asignadoA: p.asignadoA ?? "SIN_ASIGNAR" }))
+    .filter((p) => !filtro.prioridad || p.prioridad === filtro.prioridad)
+    .filter((p) => !filtro.estado || p.estado === filtro.estado)
+    .filter((p) => !filtro.asignadoA || p.asignadoA === filtro.asignadoA)
+    .map((p) => {
+      const productos = db.preguntaProductos
+        .filter((pp) => pp.preguntaId === p.id)
+        .map((pp) => db.productos.find((x) => x.id === pp.productoId))
+        .filter((x): x is Producto => !!x)
+        .sort((a, b) => a.referencia.localeCompare(b.referencia));
+      const archivos = db.preguntaDocumentos
+        .filter((pd) => pd.preguntaId === p.id)
+        .map((pd) => db.documentos.find((x) => x.id === pd.documentoId))
+        .filter((x): x is Documento => !!x)
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      return { ...p, productos, archivos };
+    })
+    .sort(
+      (a, b) =>
+        (ORDEN_ESTADO_PREGUNTA[a.estado] ?? 9) - (ORDEN_ESTADO_PREGUNTA[b.estado] ?? 9) ||
+        (ORDEN_PRIORIDAD[a.prioridad] ?? 9) - (ORDEN_PRIORIDAD[b.prioridad] ?? 9) ||
+        (b.createdAt ?? "").localeCompare(a.createdAt ?? ""),
+    );
+}
+
+export async function getReferenciasDeMarca(marcaId: string) {
+  const db = await leerDb();
+  return db.productos
+    .filter((p) => p.marcaId === marcaId)
+    .map((p) => ({ id: p.id, referencia: p.referencia, nombre: p.nombre, familia: p.familia }))
+    .sort((a, b) => a.referencia.localeCompare(b.referencia));
+}
+
+/** Usuarios de la herramienta (no estan asociados a una marca): se usan para identificar
+ * quien pregunta / quien responde en el modulo de Preguntas. */
+export async function getUsuarios() {
+  const db = await leerDb();
+  return db.usuarios.slice().sort((a, b) => a.nombre.localeCompare(b.nombre));
+}
+
+export type { Compatibilidad };

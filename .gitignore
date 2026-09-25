@@ -1,0 +1,9 @@
+node_modules
+.next
+out
+*.log
+tsconfig.tsbuildinfo
+
+# Datos de la herramienta: base de conocimiento local (db.json), archivos subidos y
+# entregables generados (curso, etc.). No es codigo fuente, vive solo en este computador.
+data/

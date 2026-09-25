@@ -1,0 +1,26 @@
+{
+  "name": "maple-armor-soporte-tecnico",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Herramienta local de soporte tecnico y biblioteca de documentacion para Maple Armor. Corre solo en tu computador, sin servidor ni base de datos externa.",
+  "scripts": {
+    "dev": "next dev -p 3100",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "16.3.6",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "server-only": "^0.0.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
