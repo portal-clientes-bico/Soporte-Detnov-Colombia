@@ -21,6 +21,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       db.usoChatbot.totalPreguntas += 1;
       db.usoChatbot.totalInputTokens += uso.inputTokens;
       db.usoChatbot.totalOutputTokens += uso.outputTokens;
+      db.usoChatbot.totalCacheReadTokens += uso.cacheReadTokens;
+      db.usoChatbot.totalCacheCreationTokens += uso.cacheCreationTokens;
       db.usoChatbot.actualizadoEn = ahora();
       return db.usoChatbot;
     });

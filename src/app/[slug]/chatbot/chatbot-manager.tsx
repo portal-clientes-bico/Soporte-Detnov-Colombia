@@ -70,6 +70,7 @@ export default function ChatbotManager({ slug, usoInicial }: { slug: string; uso
         </span>
         <span>
           <span className="font-medium text-zinc-900 dark:text-zinc-50">{totalTokens.toLocaleString("es-CO")}</span> tokens consumidos ({uso.totalInputTokens.toLocaleString("es-CO")} entrada · {uso.totalOutputTokens.toLocaleString("es-CO")} salida)
+          {uso.totalCacheReadTokens > 0 && <> · {uso.totalCacheReadTokens.toLocaleString("es-CO")} leidos de cache (mas barato)</>}
         </span>
         <span className="text-zinc-400 dark:text-zinc-500">Consumo estimado local, no el saldo de la cuenta</span>
       </div>

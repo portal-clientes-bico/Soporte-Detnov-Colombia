@@ -17,10 +17,12 @@ export class ChatbotConfigError extends Error {}
 export class ChatbotApiError extends Error {}
 
 // ------------------------------------------------------- Filtro de relevancia
-// No es "entrenamiento": es un filtro por palabras clave que reduce cuanto contexto se
-// manda a la API en cada pregunta, incluyendo el detalle completo solo de lo que parece
-// relevante y un indice compacto (solo nombres) de todo lo demas. Baja el consumo de
-// tokens sin necesidad de una base de datos vectorial.
+// No es "entrenamiento": es un filtro por palabras clave que decide que contenido puntual
+// (fragmentos del cuerpo de los PDF, preguntas cerradas con detalle) se manda ademas del
+// catalogo base. El catalogo completo de productos y la metadata de documentos SIEMPRE se
+// mandan completos (ver construirBloqueEstatico) porque van en la parte del prompt marcada
+// para cache de Anthropic: al ser identica pregunta a pregunta dentro de una sesion, se
+// factura casi completa solo la primera vez.
 const STOPWORDS = new Set([
   "que", "de", "la", "el", "los", "las", "un", "una", "unos", "unas", "para", "con", "por", "es", "son",
   "y", "o", "en", "del", "al", "se", "su", "sus", "como", "cual", "cuales", "cuál", "cuáles", "donde",
@@ -45,10 +47,33 @@ function extraerPalabrasClave(pregunta: string): string[] {
   return [...new Set(palabras)];
 }
 
+// Coincidencia por PALABRA COMPLETA (limites de palabra), no por subcadena: con substring
+// simple, una palabra clave corta como "ami" (del modulo AMI) tambien "coincide" dentro de
+// palabras en ingles como "ceramic" o "family", generando ruido. El limite de palabra evita
+// ese falso positivo sin perder la deteccion real del termino.
+const regexPorPalabra = new Map<string, RegExp>();
+function regexDePalabra(palabra: string): RegExp {
+  let r = regexPorPalabra.get(palabra);
+  if (!r) {
+    r = new RegExp(`\\b${palabra.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`);
+    regexPorPalabra.set(palabra, r);
+  }
+  return r;
+}
+
 function coincideAlgunaPalabra(texto: string | null | undefined, palabras: string[]): boolean {
   if (!texto) return false;
   const t = normalizar(texto);
-  return palabras.some((p) => t.includes(p));
+  return palabras.some((p) => regexDePalabra(p).test(t));
+}
+
+/** Cuenta cuantas palabras clave DISTINTAS aparecen en el texto (no ocurrencias totales): una
+ * pagina que menciona 3 palabras clave distintas es una senal de relevancia mucho mas fuerte
+ * que una que repite la misma palabra comun muchas veces. */
+function contarPalabrasDistintas(texto: string | null | undefined, palabras: string[]): number {
+  if (!texto) return 0;
+  const t = normalizar(texto);
+  return palabras.reduce((n, p) => n + (regexDePalabra(p).test(t) ? 1 : 0), 0);
 }
 
 function productoRelevante(p: ProductoCtx, palabras: string[]): boolean {
@@ -61,57 +86,179 @@ function productoRelevante(p: ProductoCtx, palabras: string[]): boolean {
   return false;
 }
 
-function documentoRelevante(d: DocumentoCtx, palabras: string[], referenciasRelevantes: Set<string>): boolean {
-  if (coincideAlgunaPalabra(d.titulo, palabras)) return true;
-  if (coincideAlgunaPalabra(d.codigo, palabras)) return true;
-  if (coincideAlgunaPalabra(d.notas, palabras)) return true;
-  if (coincideAlgunaPalabra(d.tipo, palabras)) return true;
-  if (d.referencias.some((r) => referenciasRelevantes.has(r))) return true;
-  // Ademas de la metadata, busca dentro del texto extraido del PDF (si lo tiene): un
-  // documento cuyo titulo no menciona la palabra clave pero cuyo contenido si, tambien debe
-  // considerarse relevante.
-  return (d.paginas ?? []).some((p) => coincideAlgunaPalabra(p.texto, palabras));
+// ------------------------------------------------- Ranking y extraccion de fragmentos
+// Cuantos documentos con fragmentos de cuerpo se incluyen como maximo, y cuanto "presupuesto"
+// de caracteres se reparte entre todos ellos (no un tope fijo por documento: una pregunta con
+// una palabra comun no debe poder inflar el prompt con 25 documentos completos).
+const MAX_DOCUMENTOS_CON_EXTRACTO = 6;
+const PRESUPUESTO_TOTAL_EXTRACTOS = 12000;
+const MAX_PAGINAS_POR_DOCUMENTO = 4;
+const MAX_EXTRACTOS_POR_PAGINA = 2;
+/** Caracteres de contexto a cada lado de la coincidencia, en vez de mandar la pagina entera. */
+const VENTANA_RADIO = 300;
+/** Si un documento es relevante por titulo/notas/referencia pero su cuerpo no menciona
+ * ninguna palabra clave, se manda solo un vistazo corto (no un extracto de 6000 caracteres). */
+const CHARS_RESUMEN_FALLBACK = 600;
+const MAX_PREGUNTAS_RELEVANTES = 15;
+
+const PESO_TITULO = 5;
+const PESO_CODIGO = 3;
+const PESO_NOTAS = 2;
+const PESO_REFERENCIA_RELEVANTE = 4;
+/** Peso por cada palabra clave distinta que aparece en la MEJOR pagina del documento (no la
+ * suma de todas las paginas): usar el total de paginas que "tocan" alguna palabra favorece a
+ * los documentos mas largos solo por tener mas paginas donde una palabra comun puede aparecer
+ * (ej. un manual de 80 paginas le gano a la ficha tecnica de 7 paginas que si tenia la
+ * respuesta, solo por mencionar "panel" en casi todas sus paginas). */
+const PESO_MEJOR_PAGINA = 3;
+
+/** Quita lineas de encabezado/pie repetitivas (paginacion, revision) antes de buscar
+ * coincidencias, para que los extractos no desperdicien caracteres en ese boilerplate. */
+function limpiarTextoPagina(texto: string): string {
+  return texto
+    .split("\n")
+    .filter((linea) => {
+      const l = linea.trim();
+      if (l.length === 0) return false;
+      if (/^page\s+\d+\s+of\s+\d+/i.test(l)) return false;
+      if (/^p[aá]gina\s+\d+\s+de\s+\d+/i.test(l)) return false;
+      if (/^rev\.?\s*[\d.]+\s+\d{1,2}\/\d{4}$/i.test(l)) return false;
+      if (/^\d+\s*\/\s*\d+$/.test(l)) return false;
+      return true;
+    })
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-/** Limite de caracteres de texto extraido incluidos por documento en el prompt, para que un
- * manual largo no dispare el consumo de tokens de una sola pregunta. */
-const MAX_CHARS_TEXTO_POR_DOCUMENTO = 6000;
-/** Maximo de paginas coincidentes a incluir por documento, aun si caben en el limite de
- * caracteres -- evita mandar decenas de paginas sueltas de un manual muy repetitivo. */
-const MAX_PAGINAS_COINCIDENTES = 6;
+interface DocumentoPuntuado {
+  documento: DocumentoCtx;
+  score: number;
+  paginasCoincidentes: PaginaCtx[];
+}
 
-interface FragmentoTexto {
-  paginas: PaginaCtx[];
-  modo: "coincidencia" | "resumen" | "ninguno";
+function puntuarDocumento(d: DocumentoCtx, palabras: string[], referenciasRelevantes: Set<string>): DocumentoPuntuado {
+  let score = contarPalabrasDistintas(d.titulo, palabras) * PESO_TITULO;
+  score += contarPalabrasDistintas(d.codigo, palabras) * PESO_CODIGO;
+  score += contarPalabrasDistintas(d.notas, palabras) * PESO_NOTAS;
+  if (d.referencias.some((r) => referenciasRelevantes.has(r))) score += PESO_REFERENCIA_RELEVANTE;
+
+  // Ordena las paginas del documento por cuantas palabras clave distintas tienen (la mas densa
+  // primero), no por numero de pagina: al extraer despues solo unas pocas (MAX_PAGINAS_POR_
+  // DOCUMENTO), asi se quedan las paginas realmente mas relacionadas y no las primeras que
+  // aparecen en el archivo.
+  const paginasConPuntaje = (d.paginas ?? [])
+    .map((p) => ({ pagina: p, distintas: contarPalabrasDistintas(p.texto, palabras) }))
+    .filter((x) => x.distintas > 0)
+    .sort((a, b) => b.distintas - a.distintas);
+
+  score += (paginasConPuntaje[0]?.distintas ?? 0) * PESO_MEJOR_PAGINA;
+
+  return { documento: d, score, paginasCoincidentes: paginasConPuntaje.map((x) => x.pagina) };
+}
+
+interface Extracto {
+  pagina: number;
+  texto: string;
+}
+
+/** Encuentra donde aparece cada palabra clave en la pagina (ya limpia) y devuelve ventanas de
+ * texto alrededor de esas coincidencias, fusionando las que se superponen, en vez de la pagina
+ * completa -- el ahorro tipico es de varias veces el tamano original. */
+function extraerVentanas(paginaTexto: string, palabras: string[]): string[] {
+  const limpio = limpiarTextoPagina(paginaTexto);
+  const normalizado = normalizar(limpio);
+  const posiciones: number[] = [];
+  for (const palabra of palabras) {
+    const regex = new RegExp(regexDePalabra(palabra).source, "g");
+    for (const m of normalizado.matchAll(regex)) {
+      if (m.index !== undefined) posiciones.push(m.index);
+    }
+  }
+  if (posiciones.length === 0) return [];
+  posiciones.sort((a, b) => a - b);
+
+  const rangos: { inicio: number; fin: number }[] = [];
+  for (const pos of posiciones) {
+    const inicio = Math.max(0, pos - VENTANA_RADIO);
+    const fin = Math.min(limpio.length, pos + VENTANA_RADIO);
+    const ultimo = rangos[rangos.length - 1];
+    if (ultimo && inicio <= ultimo.fin) {
+      ultimo.fin = Math.max(ultimo.fin, fin);
+    } else {
+      rangos.push({ inicio, fin });
+    }
+  }
+
+  return rangos.slice(0, MAX_EXTRACTOS_POR_PAGINA).map((r) => {
+    const prefijo = r.inicio > 0 ? "..." : "";
+    const sufijo = r.fin < limpio.length ? "..." : "";
+    return `${prefijo}${limpio.slice(r.inicio, r.fin)}${sufijo}`;
+  });
+}
+
+interface DocumentoConExtracto {
+  documento: DocumentoCtx;
+  modo: "coincidencia" | "resumen";
+  extractos: Extracto[];
   paginasOmitidas: number;
 }
 
 /**
- * Elige que paginas del texto extraido de un documento incluir en el prompt: primero las
- * que contienen alguna palabra clave de la pregunta (lo mas util), acotado por cantidad de
- * paginas y de caracteres; si ninguna pagina coincide (el documento es relevante por su
- * titulo/notas o por estar vinculado a una referencia relevante, no por su contenido) se
- * incluyen las primeras paginas a modo de resumen, tambien acotadas.
+ * Elige, entre los documentos confirmados, los que parecen mas relevantes para esta pregunta
+ * (por puntaje, no por orden de aparicion) y arma sus fragmentos de texto respetando un
+ * presupuesto total de caracteres compartido entre todos -- evita que una palabra clave comun
+ * que "pega" en muchos documentos infle el prompt.
  */
-function seleccionarFragmento(d: DocumentoCtx, palabras: string[]): FragmentoTexto {
-  const todasLasPaginas = d.paginas ?? [];
-  if (todasLasPaginas.length === 0) return { paginas: [], modo: "ninguno", paginasOmitidas: 0 };
+function seleccionarDocumentosConExtractos(
+  documentos: DocumentoCtx[],
+  palabras: string[],
+  referenciasRelevantes: Set<string>,
+): { seleccionados: DocumentoConExtracto[]; documentosConsiderados: number } {
+  if (palabras.length === 0) return { seleccionados: [], documentosConsiderados: 0 };
 
-  const coincidentes = palabras.length > 0 ? todasLasPaginas.filter((p) => coincideAlgunaPalabra(p.texto, palabras)) : [];
-  const candidatas = coincidentes.length > 0 ? coincidentes : todasLasPaginas;
-  const modo: FragmentoTexto["modo"] = coincidentes.length > 0 ? "coincidencia" : "resumen";
+  const puntuados = documentos
+    .map((d) => puntuarDocumento(d, palabras, referenciasRelevantes))
+    .filter((p) => p.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, MAX_DOCUMENTOS_CON_EXTRACTO);
 
-  const elegidas: PaginaCtx[] = [];
-  let caracteres = 0;
-  for (const pagina of candidatas.slice(0, MAX_PAGINAS_COINCIDENTES)) {
-    if (caracteres >= MAX_CHARS_TEXTO_POR_DOCUMENTO) break;
-    const restante = MAX_CHARS_TEXTO_POR_DOCUMENTO - caracteres;
-    const texto = pagina.texto.length > restante ? `${pagina.texto.slice(0, restante)}...` : pagina.texto;
-    elegidas.push({ numero: pagina.numero, texto });
-    caracteres += texto.length;
+  const seleccionados: DocumentoConExtracto[] = [];
+  let presupuesto = PRESUPUESTO_TOTAL_EXTRACTOS;
+
+  for (const { documento, paginasCoincidentes } of puntuados) {
+    if (presupuesto <= 0) break;
+
+    if (paginasCoincidentes.length > 0) {
+      const paginasUsadas = paginasCoincidentes.slice(0, MAX_PAGINAS_POR_DOCUMENTO);
+      const extractos: Extracto[] = [];
+      for (const pagina of paginasUsadas) {
+        if (presupuesto <= 0) break;
+        for (const texto of extraerVentanas(pagina.texto, palabras)) {
+          if (presupuesto <= 0) break;
+          const recortado = texto.length > presupuesto ? `${texto.slice(0, presupuesto)}...` : texto;
+          extractos.push({ pagina: pagina.numero, texto: recortado });
+          presupuesto -= recortado.length;
+        }
+      }
+      if (extractos.length > 0) {
+        seleccionados.push({ documento, modo: "coincidencia", extractos, paginasOmitidas: paginasCoincidentes.length - paginasUsadas.length });
+      }
+    } else {
+      // Relevante por titulo/notas/referencia, no por su contenido: un vistazo corto, no un
+      // extracto grande, para no gastar presupuesto en un documento que no tiene la respuesta.
+      const primeraPagina = (documento.paginas ?? [])[0];
+      if (!primeraPagina) continue;
+      const limpio = limpiarTextoPagina(primeraPagina.texto);
+      const largo = Math.min(CHARS_RESUMEN_FALLBACK, presupuesto);
+      if (largo <= 0) continue;
+      const texto = limpio.length > largo ? `${limpio.slice(0, largo)}...` : limpio;
+      seleccionados.push({ documento, modo: "resumen", extractos: [{ pagina: primeraPagina.numero, texto }], paginasOmitidas: (documento.paginas?.length ?? 1) - 1 });
+      presupuesto -= texto.length;
+    }
   }
 
-  return { paginas: elegidas, modo, paginasOmitidas: candidatas.length - elegidas.length };
+  return { seleccionados, documentosConsiderados: puntuados.length };
 }
 
 function preguntaRelevante(p: PreguntaCtx, palabras: string[], referenciasRelevantes: Set<string>): boolean {
@@ -122,55 +269,37 @@ function preguntaRelevante(p: PreguntaCtx, palabras: string[], referenciasReleva
 }
 
 interface ContextoFiltrado {
-  palabras: string[];
-  productosRelevantes: ProductoCtx[];
-  productosIndice: { referencia: string; nombre: string }[];
-  documentosRelevantes: DocumentoCtx[];
+  referenciasRelevantes: string[];
+  documentosConExtracto: DocumentoConExtracto[];
   documentosOmitidos: number;
   preguntasRelevantes: PreguntaCtx[];
   preguntasOmitidas: number;
 }
 
-/** Limite de items relevantes por categoria, para no volver a inflar el contexto si la
- * pregunta es muy generica y "coincide" con medio catalogo. */
-const MAX_RELEVANTES = 25;
-
-export function filtrarContexto(pregunta: string, contexto: Contexto): ContextoFiltrado {
+function filtrarContexto(pregunta: string, contexto: Contexto): ContextoFiltrado {
   const palabras = extraerPalabrasClave(pregunta);
-
-  // Sin palabras clave utiles (pregunta muy corta/generica): no hay como filtrar con
-  // sentido, se manda el indice compacto de todo y el detalle completo de nada puntual.
   if (palabras.length === 0) {
     return {
-      palabras,
-      productosRelevantes: [],
-      productosIndice: contexto.productos.map((p) => ({ referencia: p.referencia, nombre: p.nombre })),
-      documentosRelevantes: [],
+      referenciasRelevantes: [],
+      documentosConExtracto: [],
       documentosOmitidos: contexto.documentosConfirmados.length,
       preguntasRelevantes: [],
       preguntasOmitidas: contexto.preguntasCerradas.length,
     };
   }
 
-  const productosRelevantes = contexto.productos.filter((p) => productoRelevante(p, palabras)).slice(0, MAX_RELEVANTES);
+  const productosRelevantes = contexto.productos.filter((p) => productoRelevante(p, palabras));
   const referenciasRelevantes = new Set(productosRelevantes.map((p) => p.referencia));
 
-  const productosIndice = contexto.productos
-    .filter((p) => !referenciasRelevantes.has(p.referencia))
-    .map((p) => ({ referencia: p.referencia, nombre: p.nombre }));
-
-  const documentosRelevantesTodos = contexto.documentosConfirmados.filter((d) => documentoRelevante(d, palabras, referenciasRelevantes));
-  const documentosRelevantes = documentosRelevantesTodos.slice(0, MAX_RELEVANTES);
+  const { seleccionados, documentosConsiderados } = seleccionarDocumentosConExtractos(contexto.documentosConfirmados, palabras, referenciasRelevantes);
 
   const preguntasRelevantesTodas = contexto.preguntasCerradas.filter((p) => preguntaRelevante(p, palabras, referenciasRelevantes));
-  const preguntasRelevantes = preguntasRelevantesTodas.slice(0, MAX_RELEVANTES);
+  const preguntasRelevantes = preguntasRelevantesTodas.slice(0, MAX_PREGUNTAS_RELEVANTES);
 
   return {
-    palabras,
-    productosRelevantes,
-    productosIndice,
-    documentosRelevantes,
-    documentosOmitidos: contexto.documentosConfirmados.length - documentosRelevantes.length,
+    referenciasRelevantes: [...referenciasRelevantes],
+    documentosConExtracto: seleccionados,
+    documentosOmitidos: documentosConsiderados - seleccionados.length,
     preguntasRelevantes,
     preguntasOmitidas: contexto.preguntasCerradas.length - preguntasRelevantes.length,
   };
@@ -182,8 +311,11 @@ function formatearEspecificaciones(especificaciones: ProductoCtx["especificacion
   return especificaciones.map((e) => `${e.nombre}: ${e.valor}`).join("; ");
 }
 
-function formatearProductosDetalle(productos: ProductoCtx[]): string {
-  if (productos.length === 0) return "(ninguna referencia parecio relevante para esta pregunta)";
+/** Catalogo completo (todas las referencias, con detalle) -- va en el bloque cacheado, por
+ * eso no se filtra por pregunta: filtrar aqui rompería la cache (el contenido cacheado debe
+ * ser identico entre preguntas). */
+function formatearCatalogoCompleto(productos: ProductoCtx[]): string {
+  if (productos.length === 0) return "(sin referencias registradas)";
   return productos
     .map((p) => {
       const partes = [`- [PRODUCTO] ${p.referencia} — ${p.nombre} (familia: ${labelFamilia(p.familia)}, estado: ${p.estado})`];
@@ -196,38 +328,47 @@ function formatearProductosDetalle(productos: ProductoCtx[]): string {
     .join("\n");
 }
 
-function formatearProductosIndice(indice: { referencia: string; nombre: string }[]): string {
-  if (indice.length === 0) return "";
-  return indice.map((p) => `${p.referencia} (${p.nombre})`).join(", ");
-}
-
-function formatearDocumentos(documentos: DocumentoCtx[], palabras: string[]): string {
-  if (documentos.length === 0) return "(ningun documento confirmado parecio relevante para esta pregunta)";
+/** Metadata de todos los documentos confirmados, sin el cuerpo del archivo -- tambien va en
+ * el bloque cacheado. */
+function formatearDocumentosMetadata(documentos: DocumentoCtx[]): string {
+  if (documentos.length === 0) return "(sin documentos confirmados)";
   return documentos
     .map((d) => {
       const detalle = [d.tipo, d.codigo, d.revision, d.fechaEmision, d.idioma].filter(Boolean).join(" · ");
-      const partes = [`- [DOCUMENTO CONFIRMADO] "${d.titulo}"${detalle ? ` (${detalle})` : ""}`];
+      const tieneTexto = (d.paginas?.length ?? 0) > 0;
+      const partes = [`- [DOCUMENTO] "${d.titulo}"${detalle ? ` (${detalle})` : ""}${tieneTexto ? "" : " [sin texto extraido]"}`];
       if (d.fuente) partes.push(`  Fuente: ${d.fuente}`);
       if (d.referencias.length > 0) partes.push(`  Referencias: ${d.referencias.join(", ")}`);
       if (d.notas) partes.push(`  Notas: ${d.notas}`);
-
-      const fragmento = seleccionarFragmento(d, palabras);
-      if (fragmento.paginas.length === 0) {
-        partes.push("  Contenido del archivo: no disponible (no se pudo extraer texto, o es un archivo sin descargar/tipo no soportado)");
-      } else {
-        const encabezado = fragmento.modo === "coincidencia" ? "Fragmentos del archivo que mencionan la pregunta" : "Extracto inicial del archivo (su contenido no coincidio con palabras clave puntuales)";
-        partes.push(`  ${encabezado}:`);
-        for (const pagina of fragmento.paginas) {
-          partes.push(`    [pagina ${pagina.numero}] ${pagina.texto.replace(/\n+/g, " ").trim()}`);
-        }
-        if (fragmento.paginasOmitidas > 0) partes.push(`    (hay ${fragmento.paginasOmitidas} pagina(s) adicional(es) del mismo archivo no incluidas aqui por espacio)`);
-      }
       return partes.join("\n");
     })
     .join("\n");
 }
 
-function formatearPreguntas(preguntas: PreguntaCtx[]): string {
+/** Solo los titulos de las preguntas cerradas (para que el modelo sepa que existen); el
+ * contenido y la respuesta completos solo se mandan para las que resultan relevantes a la
+ * pregunta actual (bloque dinamico, ver formatearPreguntasDetalle). */
+function formatearPreguntasIndice(preguntas: PreguntaCtx[]): string {
+  if (preguntas.length === 0) return "(sin preguntas de soporte cerradas todavia)";
+  return preguntas.map((p) => `- "${p.titulo}"${p.referencias.length > 0 ? ` (${p.referencias.join(", ")})` : ""}`).join("\n");
+}
+
+function formatearDocumentosConExtracto(seleccionados: DocumentoConExtracto[]): string {
+  if (seleccionados.length === 0) return "(ningun documento parecio tener contenido puntual relacionado con esta pregunta)";
+  return seleccionados
+    .map(({ documento, modo, extractos, paginasOmitidas }) => {
+      const encabezado = modo === "coincidencia" ? "Fragmentos que mencionan la pregunta" : "Vistazo del documento (su contenido no coincidio con palabras clave puntuales)";
+      const partes = [`- "${documento.titulo}" -- ${encabezado}:`];
+      for (const extracto of extractos) {
+        partes.push(`    [pagina ${extracto.pagina}] ${extracto.texto}`);
+      }
+      if (paginasOmitidas > 0) partes.push(`    (hay ${paginasOmitidas} pagina(s) adicional(es) de este documento no incluidas aqui por espacio)`);
+      return partes.join("\n");
+    })
+    .join("\n");
+}
+
+function formatearPreguntasDetalle(preguntas: PreguntaCtx[]): string {
   if (preguntas.length === 0) return "(ninguna pregunta cerrada parecio relevante para esta pregunta)";
   return preguntas
     .map((p) => {
@@ -240,37 +381,60 @@ function formatearPreguntas(preguntas: PreguntaCtx[]): string {
     .join("\n");
 }
 
-function construirSystemPrompt(marcaNombre: string, filtrado: ContextoFiltrado): string {
-  const indiceTexto = formatearProductosIndice(filtrado.productosIndice);
+/**
+ * Parte fija del prompt: instrucciones + catalogo completo de productos + metadata de todos
+ * los documentos confirmados + indice de preguntas cerradas. Es identica entre preguntas de
+ * una misma sesion (mientras no cambie el catalogo), por lo que se marca con cache_control
+ * para que Anthropic la facture casi completa solo la primera vez.
+ */
+function construirBloqueEstatico(marcaNombre: string, contexto: Contexto): string {
   return [
     `Eres el asistente tecnico interno de Detnov Colombia para el soporte de la marca "${marcaNombre}".`,
-    "Responde SOLO con base en la informacion suministrada abajo (referencias de producto, documentos con confianza CONFIRMADO, y preguntas de soporte ya cerradas con respuesta). No inventes especificaciones, precios ni referencias que no esten en esta informacion.",
-    "IMPORTANTE: para cada documento confirmado abajo ves su metadata (titulo, tipo, notas) y, cuando la herramienta pudo extraer texto del archivo (hoy solo PDF; Excel, escaneados y archivos sin descargar no tienen texto extraido), tambien fragmentos reales de su contenido -- ya sea las paginas que mencionan la pregunta, o un extracto inicial si ninguna pagina coincidio puntualmente. No es el archivo completo: por espacio, solo se incluyen algunas paginas por documento. Si un dato puntual (un valor exacto, un procedimiento, una cifra) no aparece en los fragmentos incluidos, di que no esta capturado en lo que tienes disponible y que hay que abrir el documento original (menciona cual, por titulo) para confirmarlo -- no asumas que 'no existe' en el documento, solo que no esta en el fragmento que se te dio.",
-    "Para reducir el consumo de tokens, solo se incluye el detalle completo de las referencias/documentos/preguntas que parecen relacionadas con esta pregunta especifica; el resto del catalogo de referencias aparece solo como una lista de nombres (sin detalle) para que sepas que existen.",
+    "Responde SOLO con base en la informacion suministrada (catalogo de referencias, documentos con confianza CONFIRMADO, y preguntas de soporte ya cerradas con respuesta). No inventes especificaciones, precios ni referencias que no esten en esta informacion.",
+    "IMPORTANTE: para cada documento ves su metadata (titulo, tipo, notas) siempre, pero el contenido real del archivo (cuando existe texto extraido -- hoy solo PDF; Excel, escaneados y archivos sin descargar no lo tienen) solo aparece mas abajo para los documentos que parecieron relacionados con la pregunta especifica, y no es el archivo completo: son fragmentos (paginas que mencionan la pregunta, o un vistazo inicial si ninguna coincidio puntualmente). Si un dato puntual (un valor exacto, un procedimiento, una cifra) no aparece en los fragmentos incluidos, di que no esta capturado en lo que tienes disponible y que hay que abrir el documento original (menciona cual, por titulo) para confirmarlo -- no asumas que 'no existe' en el documento, solo que no esta en el fragmento que se te dio.",
     "Si la informacion disponible no alcanza para responder con certeza, dilo explicitamente en vez de adivinar.",
     "Responde en español, de forma clara y tecnica, apta para un ingeniero.",
     "Al final de tu respuesta agrega siempre una seccion literal 'Fuentes utilizadas:' con una lista de los documentos (titulo, y codigo si lo tiene) y/o preguntas cerradas que usaste para responder. Si no usaste ninguna fuente puntual porque la respuesta es general, escribe 'Fuentes utilizadas: ninguna en particular'.",
     "",
-    "=== REFERENCIAS DE PRODUCTO RELEVANTES (detalle completo) ===",
-    formatearProductosDetalle(filtrado.productosRelevantes),
+    "=== CATALOGO COMPLETO DE REFERENCIAS DE PRODUCTO ===",
+    formatearCatalogoCompleto(contexto.productos),
     "",
-    indiceTexto ? `=== OTRAS REFERENCIAS EXISTENTES (solo nombre, sin detalle) ===\n${indiceTexto}` : "",
+    "=== DOCUMENTOS CONFIRMADOS (metadata; el contenido puntual relevante, si lo hay, va mas abajo) ===",
+    formatearDocumentosMetadata(contexto.documentosConfirmados),
     "",
-    "=== DOCUMENTOS CONFIRMADOS RELEVANTES ===",
-    formatearDocumentos(filtrado.documentosRelevantes, filtrado.palabras),
-    filtrado.documentosOmitidos > 0 ? `(hay ${filtrado.documentosOmitidos} documento(s) confirmado(s) adicional(es) que no parecieron relacionados con esta pregunta y no se incluyeron)` : "",
+    "=== PREGUNTAS DE SOPORTE CERRADAS (titulos; el detalle de las relevantes va mas abajo) ===",
+    formatearPreguntasIndice(contexto.preguntasCerradas),
+  ].join("\n");
+}
+
+/**
+ * Parte variable del prompt: fragmentos de documentos y preguntas cerradas especificos de
+ * esta pregunta. Cambia en cada llamada, por lo que NO se marca para cache -- se agrega
+ * despues del bloque cacheado sin invalidarlo.
+ */
+function construirBloqueDinamico(pregunta: string, filtrado: ContextoFiltrado): string {
+  const partes = [
+    "A continuacion, contenido puntual seleccionado especificamente para la pregunta actual del usuario (no es todo lo disponible, solo lo que parecio mas relacionado):",
     "",
-    "=== PREGUNTAS DE SOPORTE CERRADAS RELEVANTES ===",
-    formatearPreguntas(filtrado.preguntasRelevantes),
-    filtrado.preguntasOmitidas > 0 ? `(hay ${filtrado.preguntasOmitidas} pregunta(s) cerrada(s) adicional(es) que no parecieron relacionadas con esta pregunta y no se incluyeron)` : "",
-  ]
-    .filter((linea) => linea !== "")
-    .join("\n");
+    "=== CONTENIDO DE DOCUMENTOS RELACIONADO CON LA PREGUNTA ===",
+    formatearDocumentosConExtracto(filtrado.documentosConExtracto),
+  ];
+  if (filtrado.documentosOmitidos > 0) {
+    partes.push(`(hay ${filtrado.documentosOmitidos} documento(s) adicional(es) que parecieron algo relacionados pero no se incluyeron por espacio)`);
+  }
+  partes.push("", "=== PREGUNTAS DE SOPORTE CERRADAS RELACIONADAS (detalle completo) ===", formatearPreguntasDetalle(filtrado.preguntasRelevantes));
+  if (filtrado.preguntasOmitidas > 0) {
+    partes.push(`(hay ${filtrado.preguntasOmitidas} pregunta(s) cerrada(s) adicional(es) que no parecieron relacionadas y no se incluyeron)`);
+  }
+  if (filtrado.referenciasRelevantes.length === 0 && filtrado.documentosConExtracto.length === 0 && filtrado.preguntasRelevantes.length === 0) {
+    partes.push("", "(la pregunta no tuvo palabras clave especificas o no coincidio con nada puntual; respondela con base en el catalogo y la metadata de arriba)");
+  }
+  return partes.join("\n");
 }
 
 export interface RespuestaChatbot {
   texto: string;
-  uso: { inputTokens: number; outputTokens: number };
+  uso: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheCreationTokens: number };
 }
 
 export async function preguntarChatbot(pregunta: string, marcaNombre: string, contexto: Contexto): Promise<RespuestaChatbot> {
@@ -282,7 +446,8 @@ export async function preguntarChatbot(pregunta: string, marcaNombre: string, co
   }
 
   const filtrado = filtrarContexto(pregunta, contexto);
-  const systemPrompt = construirSystemPrompt(marcaNombre, filtrado);
+  const bloqueEstatico = construirBloqueEstatico(marcaNombre, contexto);
+  const bloqueDinamico = construirBloqueDinamico(pregunta, filtrado);
 
   const res = await fetch(ANTHROPIC_API_URL, {
     method: "POST",
@@ -294,7 +459,10 @@ export async function preguntarChatbot(pregunta: string, marcaNombre: string, co
     body: JSON.stringify({
       model: MODEL,
       max_tokens: MAX_TOKENS,
-      system: systemPrompt,
+      system: [
+        { type: "text", text: bloqueEstatico, cache_control: { type: "ephemeral" } },
+        { type: "text", text: bloqueDinamico },
+      ],
       messages: [{ role: "user", content: pregunta }],
     }),
   });
@@ -311,6 +479,8 @@ export async function preguntarChatbot(pregunta: string, marcaNombre: string, co
   const uso = {
     inputTokens: typeof data.usage?.input_tokens === "number" ? data.usage.input_tokens : 0,
     outputTokens: typeof data.usage?.output_tokens === "number" ? data.usage.output_tokens : 0,
+    cacheReadTokens: typeof data.usage?.cache_read_input_tokens === "number" ? data.usage.cache_read_input_tokens : 0,
+    cacheCreationTokens: typeof data.usage?.cache_creation_input_tokens === "number" ? data.usage.cache_creation_input_tokens : 0,
   };
   return { texto, uso };
 }

@@ -196,6 +196,13 @@ export interface UsoChatbot {
   totalPreguntas: number;
   totalInputTokens: number;
   totalOutputTokens: number;
+  /** Tokens de entrada facturados a precio reducido por venir de la cache de prompts de
+   * Anthropic (catalogo de referencias + metadata de documentos, ver src/lib/chatbot.ts). */
+  totalCacheReadTokens: number;
+  /** Tokens de entrada facturados con el recargo de "escribir" la cache (la primera vez que
+   * se arma, o cuando expira). Se distingue de totalInputTokens para poder ver si la cache
+   * realmente se esta reutilizando entre preguntas. */
+  totalCacheCreationTokens: number;
   actualizadoEn: string | null;
 }
 
@@ -227,7 +234,7 @@ function dbVacia(): Db {
     preguntaProductos: [],
     preguntaDocumentos: [],
     usuarios: [],
-    usoChatbot: { totalPreguntas: 0, totalInputTokens: 0, totalOutputTokens: 0, actualizadoEn: null },
+    usoChatbot: { totalPreguntas: 0, totalInputTokens: 0, totalOutputTokens: 0, totalCacheReadTokens: 0, totalCacheCreationTokens: 0, actualizadoEn: null },
   };
 }
 
@@ -252,7 +259,10 @@ function normalizarDb(parcial: Partial<Db>): Db {
     preguntaProductos: parcial.preguntaProductos ?? vacia.preguntaProductos,
     preguntaDocumentos: parcial.preguntaDocumentos ?? vacia.preguntaDocumentos,
     usuarios: parcial.usuarios ?? vacia.usuarios,
-    usoChatbot: parcial.usoChatbot ?? vacia.usoChatbot,
+    // Merge campo a campo (no solo el objeto completo): un db.json escrito antes de agregar
+    // totalCacheReadTokens/totalCacheCreationTokens tendria un usoChatbot sin esas llaves, y
+    // sumarles encima daria NaN.
+    usoChatbot: { ...vacia.usoChatbot, ...parcial.usoChatbot },
   };
 }
 
