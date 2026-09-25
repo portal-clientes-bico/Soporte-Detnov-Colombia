@@ -140,3 +140,31 @@ export const usuarioSchema = z.object({
 });
 
 export const usuarioPatchSchema = usuarioSchema.partial();
+
+const emailRequerido = z
+  .string()
+  .trim()
+  .min(3)
+  .max(200)
+  .refine((v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), "Email invalido");
+
+/** Crear usuario con acceso: requiere email (es el identificador de inicio de sesion) y contrasena. */
+export const usuarioConPasswordSchema = z.object({
+  nombre: z.string().trim().min(1).max(120),
+  email: emailRequerido,
+  password: z.string().min(4).max(200),
+});
+
+/** Establecer o cambiar la contrasena de un usuario existente (accion separada del PATCH normal). */
+export const usuarioPasswordSchema = z.object({
+  password: z.string().min(4).max(200),
+});
+
+export const loginSchema = z.object({
+  email: z.string().trim().min(1).max(200),
+  password: z.string().min(1).max(200),
+});
+
+export const chatbotPreguntaSchema = z.object({
+  pregunta: z.string().trim().min(3).max(2000),
+});

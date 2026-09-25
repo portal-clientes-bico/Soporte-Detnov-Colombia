@@ -233,7 +233,7 @@ export async function aplicarSemilla(semilla: SemillaMarca): Promise<ResultadoSe
     if (existente) {
       Object.assign(existente, data, { updatedAt: now });
     } else {
-      db.documentos.push({ id, marcaId, archivoNombre: null, archivoPath: null, ...data, createdAt: now, updatedAt: now });
+      db.documentos.push({ id, marcaId, archivoNombre: null, archivoPath: null, textoExtraidoEn: null, ...data, createdAt: now, updatedAt: now });
     }
 
     for (const ref of d.referencias ?? []) {

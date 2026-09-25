@@ -1,7 +1,8 @@
 /**
- * Identidad del usuario actual de esta herramienta, guardada en localStorage del
- * navegador (no hay autenticacion: es una comodidad para prellenar "quien pregunta" /
- * "quien responde" en el modulo de Preguntas, no un control de acceso).
+ * Sesion del usuario actual en este navegador. El inicio de sesion (correo + contrasena)
+ * se valida contra el servidor en /api/usuarios/login; una vez validado, solo se guarda
+ * aqui el id y el nombre (nunca la contrasena) para prellenar "quien pregunta" / "quien
+ * responde" en el modulo de Preguntas y mostrar quien esta identificado.
  */
 export const USUARIO_ACTUAL_KEY = "soporte-tecnico:usuario-actual";
 
@@ -29,6 +30,14 @@ export function guardarUsuarioActual(usuario: UsuarioActual): void {
   } catch {
     // localStorage no disponible (modo privado, etc.): la herramienta sigue funcionando,
     // simplemente sin prellenar los campos de autor/respondedor.
+  }
+}
+
+export function olvidarUsuarioActual(): void {
+  try {
+    window.localStorage.removeItem(USUARIO_ACTUAL_KEY);
+  } catch {
+    // ver nota en guardarUsuarioActual
   }
 }
 

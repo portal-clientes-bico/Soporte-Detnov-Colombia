@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { mutarDb, nuevoId, ahora, leerDb } from "@/lib/db";
 import { preguntaArchivoCamposSchema } from "@/lib/schemas";
 import { guardarArchivo, ArchivoValidationError } from "@/lib/storage";
+import { extraerYGuardarSiCorresponde } from "@/lib/extraccion-texto";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -56,6 +57,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       archivoPath: guardado.archivoPath,
       confianza: "CONFIRMADO",
       notas: parsed.data.notas ?? `Adjuntado desde la pregunta: ${pregunta.titulo}`,
+      textoExtraidoEn: null,
       createdAt: now,
       updatedAt: now,
     });
@@ -68,6 +70,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
     return nuevoDocId;
   });
+
+  // Extraccion de texto para el ChatBot: intento aparte, nunca hace fallar la subida.
+  const extraidoEn = await extraerYGuardarSiCorresponde({ id: documentoId, confianza: "CONFIRMADO", archivoPath: guardado.archivoPath });
+  if (extraidoEn) {
+    await mutarDb((db) => {
+      const doc = db.documentos.find((d) => d.id === documentoId);
+      if (doc) doc.textoExtraidoEn = extraidoEn;
+    });
+  }
 
   return NextResponse.json({ ok: true, documentoId });
 }

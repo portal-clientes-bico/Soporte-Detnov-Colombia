@@ -14,6 +14,9 @@ import { randomUUID } from "crypto";
 const DATA_DIR = path.join(process.cwd(), "data");
 const DB_PATH = path.join(DATA_DIR, "db.json");
 export const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
+/** Texto extraido de los archivos confirmados, para el ChatBot. Un JSON por documento
+ * (paginado), nunca contenido subido directamente por un usuario. */
+export const TEXTO_EXTRAIDO_DIR = path.join(DATA_DIR, "uploads-texto");
 
 export type SoporteFuenteTipo =
   | "FABRICANTE"
@@ -122,6 +125,10 @@ export interface Documento {
   archivoPath: string | null;
   confianza: SoporteConfianza;
   notas: string | null;
+  /** Fecha en que se extrajo el texto del archivo local para el ChatBot (null = nunca
+   * intentado, o no aplica: sin archivo, tipo no soportado, o confianza distinta de
+   * CONFIRMADO). Ver src/lib/extraccion-texto.ts. */
+  textoExtraidoEn: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -173,6 +180,8 @@ export interface Usuario {
   id: string;
   nombre: string;
   email: string | null;
+  /** "salt:hash" (scrypt). Nunca se envia al cliente; ver queries.ts (getUsuarios lo omite). */
+  passwordHash: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -234,6 +243,7 @@ function normalizarDb(parcial: Partial<Db>): Db {
 async function asegurarCarpetas(): Promise<void> {
   await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.mkdir(UPLOADS_DIR, { recursive: true });
+  await fs.mkdir(TEXTO_EXTRAIDO_DIR, { recursive: true });
 }
 
 /** Lee el archivo completo. Si no existe todavia, lo crea vacio. */

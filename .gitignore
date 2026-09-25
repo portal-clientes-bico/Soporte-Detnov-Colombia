@@ -7,3 +7,8 @@ tsconfig.tsbuildinfo
 # Datos de la herramienta: base de conocimiento local (db.json), archivos subidos y
 # entregables generados (curso, etc.). No es codigo fuente, vive solo en este computador.
 data/
+
+# Claves y secretos locales (ej. ANTHROPIC_API_KEY para el ChatBot). Nunca a git.
+.env
+.env.local
+.env*.local

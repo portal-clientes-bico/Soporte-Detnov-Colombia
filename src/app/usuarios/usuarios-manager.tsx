@@ -11,7 +11,7 @@ const inputClass =
   "w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50";
 
 function valoresIniciales() {
-  return { nombre: "", email: "" };
+  return { nombre: "", email: "", password: "" };
 }
 
 function UsuarioCampos({ valores, onChange }: { valores: { nombre: string; email: string }; onChange: (campo: string, valor: string) => void }) {
@@ -22,7 +22,7 @@ function UsuarioCampos({ valores, onChange }: { valores: { nombre: string; email
         <input value={valores.nombre} onChange={(e) => onChange("nombre", e.target.value)} required minLength={1} className={inputClass} />
       </div>
       <div>
-        <label className="block text-sm text-zinc-600 dark:text-zinc-400">Email (opcional)</label>
+        <label className="block text-sm text-zinc-600 dark:text-zinc-400">Email</label>
         <input type="email" value={valores.email} onChange={(e) => onChange("email", e.target.value)} className={inputClass} />
       </div>
     </div>
@@ -67,7 +67,28 @@ function NuevoUsuarioForm() {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
       <p className="font-medium">Nuevo usuario</p>
-      <UsuarioCampos valores={valores} onChange={(c, v) => setValores((prev) => ({ ...prev, [c]: v }))} />
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">El email y la contrasena son necesarios para que la persona pueda iniciar sesion.</p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <label className="block text-sm text-zinc-600 dark:text-zinc-400">Nombre</label>
+          <input value={valores.nombre} onChange={(e) => setValores((p) => ({ ...p, nombre: e.target.value }))} required minLength={1} className={inputClass} />
+        </div>
+        <div>
+          <label className="block text-sm text-zinc-600 dark:text-zinc-400">Email</label>
+          <input type="email" value={valores.email} onChange={(e) => setValores((p) => ({ ...p, email: e.target.value }))} required className={inputClass} />
+        </div>
+        <div>
+          <label className="block text-sm text-zinc-600 dark:text-zinc-400">Contrasena</label>
+          <input
+            type="password"
+            value={valores.password}
+            onChange={(e) => setValores((p) => ({ ...p, password: e.target.value }))}
+            required
+            minLength={4}
+            className={inputClass}
+          />
+        </div>
+      </div>
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       <div className="flex gap-3">
         <button type="submit" disabled={loading} className="self-start rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-60 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300">
@@ -78,6 +99,80 @@ function NuevoUsuarioForm() {
         </button>
       </div>
     </form>
+  );
+}
+
+function PasswordPanel({ usuarioId, tienePassword }: { usuarioId: string; tienePassword: boolean }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [guardado, setGuardado] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    const res = await fetch(`/api/usuarios/${usuarioId}/password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setLoading(false);
+    if (!res.ok) {
+      setError(data.error ?? "No se pudo guardar la contrasena");
+      return;
+    }
+    setPassword("");
+    setOpen(false);
+    setGuardado(true);
+    router.refresh();
+  }
+
+  return (
+    <div className="mt-2 flex flex-col gap-1.5">
+      <div className="flex items-center gap-2 text-xs">
+        <span className={`rounded-full px-2 py-0.5 ${tienePassword ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300" : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"}`}>
+          {tienePassword ? "Con contrasena" : "Sin contrasena — no puede iniciar sesion"}
+        </span>
+        {!open && (
+          <button type="button" onClick={() => setOpen(true)} className="text-zinc-500 underline hover:text-zinc-900 dark:hover:text-zinc-50">
+            {tienePassword ? "Cambiar contrasena" : "Establecer contrasena"}
+          </button>
+        )}
+        {guardado && !open && <span className="text-emerald-700 dark:text-emerald-400">Guardada</span>}
+      </div>
+      {open && (
+        <form onSubmit={handleSubmit} className="flex flex-wrap items-center gap-2">
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Nueva contrasena"
+            required
+            minLength={4}
+            className="w-44 rounded-lg border border-zinc-300 px-2 py-1 text-xs text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
+          />
+          <button type="submit" disabled={loading} className="rounded-full bg-zinc-900 px-3 py-1 text-xs font-medium text-white hover:bg-zinc-700 disabled:opacity-60 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300">
+            {loading ? "Guardando..." : "Guardar"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              setPassword("");
+              setError(null);
+            }}
+            className="text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-50"
+          >
+            Cancelar
+          </button>
+        </form>
+      )}
+      {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+    </div>
   );
 }
 
@@ -149,6 +244,7 @@ function UsuarioCard({ usuario }: { usuario: Usuario }) {
           {esActual && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">Tu</span>}
         </div>
         {usuario.email && <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{usuario.email}</p>}
+        <PasswordPanel usuarioId={usuario.id} tienePassword={usuario.tienePassword} />
         {error && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>}
       </div>
       <div className="flex shrink-0 gap-3 text-sm">

@@ -1,4 +1,4 @@
-# Soporte Tecnico Maple Armor (herramienta local)
+# Base de conocimiento técnico Detnov Colombia (herramienta local)
 
 Base de conocimiento y biblioteca de documentacion tecnica, pensada para correr **solo en tu
 computador**. No depende de ningun servidor externo, base de datos en la nube ni cuenta de

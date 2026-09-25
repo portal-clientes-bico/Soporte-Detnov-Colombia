@@ -12,7 +12,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (!existente) return null;
     Object.assign(existente, parsed.data);
     existente.updatedAt = ahora();
-    return existente;
+    const { passwordHash: _omit, ...sinPassword } = existente;
+    return sinPassword;
   });
 
   if (!usuario) return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });

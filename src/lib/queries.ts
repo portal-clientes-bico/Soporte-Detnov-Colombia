@@ -297,10 +297,76 @@ export async function getReferenciasDeMarca(marcaId: string) {
 }
 
 /** Usuarios de la herramienta (no estan asociados a una marca): se usan para identificar
- * quien pregunta / quien responde en el modulo de Preguntas. */
+ * quien pregunta / quien responde en el modulo de Preguntas. El hash de contrasena nunca
+ * se expone al cliente -- solo se informa si el usuario tiene una contrasena configurada. */
 export async function getUsuarios() {
   const db = await leerDb();
-  return db.usuarios.slice().sort((a, b) => a.nombre.localeCompare(b.nombre));
+  return db.usuarios
+    .slice()
+    .sort((a, b) => a.nombre.localeCompare(b.nombre))
+    .map(({ passwordHash, ...u }) => ({ ...u, tienePassword: !!passwordHash }));
+}
+
+/**
+ * Reune el conocimiento con el que el ChatBot puede fundamentar una respuesta: productos
+ * de la marca, documentos con confianza CONFIRMADO (nunca PROBABLE/PENDIENTE, que son
+ * pistas sin verificar) y preguntas de soporte ya cerradas con respuesta (el conocimiento
+ * "resuelto" del equipo). No incluye el contenido de los archivos en si (no hay extraccion
+ * de texto de PDFs en la herramienta), solo la metadata capturada en la base.
+ */
+export async function getContextoChatbot(marcaId: string) {
+  const db = await leerDb();
+
+  const productos = db.productos
+    .filter((p) => p.marcaId === marcaId)
+    .map((p) => ({
+      referencia: p.referencia,
+      nombre: p.nombre,
+      familia: p.familia,
+      estado: p.estado,
+      descripcion: p.descripcion,
+      notas: p.notas,
+      especificaciones: p.especificaciones,
+    }));
+
+  const documentosConfirmados = db.documentos
+    .filter((d) => d.marcaId === marcaId && d.confianza === "CONFIRMADO")
+    .map((d) => {
+      const fuente = d.fuenteId ? (db.fuentes.find((f) => f.id === d.fuenteId) ?? null) : null;
+      const referencias = db.documentoProductos
+        .filter((dp) => dp.documentoId === d.id)
+        .map((dp) => db.productos.find((p) => p.id === dp.productoId)?.referencia)
+        .filter((r): r is string => !!r);
+      return {
+        titulo: d.titulo,
+        tipo: d.tipo,
+        codigo: d.codigo,
+        revision: d.revision,
+        fechaEmision: d.fechaEmision,
+        idioma: d.idioma,
+        notas: d.notas,
+        fuente: fuente?.nombre ?? null,
+        referencias,
+      };
+    });
+
+  const preguntasCerradas = db.preguntas
+    .filter((p) => p.marcaId === marcaId && p.estado === "CERRADA" && p.respuesta)
+    .map((p) => {
+      const referencias = db.preguntaProductos
+        .filter((pp) => pp.preguntaId === p.id)
+        .map((pp) => db.productos.find((x) => x.id === pp.productoId)?.referencia)
+        .filter((r): r is string => !!r);
+      return {
+        titulo: p.titulo,
+        contenido: p.contenido,
+        respuesta: p.respuesta as string,
+        respondedor: p.respondedor,
+        referencias,
+      };
+    });
+
+  return { productos, documentosConfirmados, preguntasCerradas };
 }
 
 export type { Compatibilidad };

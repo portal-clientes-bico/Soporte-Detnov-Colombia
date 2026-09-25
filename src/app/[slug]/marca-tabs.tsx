@@ -13,6 +13,7 @@ export default function MarcaTabs({ slug }: { slug: string }) {
     { href: `${base}/documentos`, label: "Documentos" },
     { href: `${base}/fuentes`, label: "Fuentes" },
     { href: `${base}/hallazgos`, label: "Hallazgos" },
+    { href: `${base}/chatbot`, label: "ChatBot" },
   ];
 
   return (
