@@ -73,15 +73,15 @@ function SelectorReferencias({
         placeholder="Buscar producto..."
         className={inputClass}
       />
-      <div className="grid max-h-48 grid-cols-1 gap-1 overflow-y-auto rounded-lg border border-zinc-200 p-2 sm:grid-cols-2 dark:border-zinc-800">
+      <div className="flex max-h-48 flex-col gap-1 overflow-y-auto rounded-lg border border-zinc-200 p-2 dark:border-zinc-800">
         {filtradas.length === 0 ? (
-          <p className="col-span-full text-xs text-zinc-500 dark:text-zinc-400">Sin coincidencias.</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">Sin coincidencias.</p>
         ) : (
           filtradas.map((r) => (
             <label key={r.id} className="flex items-start gap-1.5 text-xs text-zinc-700 dark:text-zinc-300" title={r.descripcion ?? undefined}>
               <input type="checkbox" checked={seleccionadas.includes(r.id)} onChange={() => onToggle(r.id)} className="mt-0.5 shrink-0" />
-              <span>
-                <span className="font-medium">{r.referencia}</span>
+              <span className="min-w-0">
+                <span className="font-medium">{r.referencia}</span> <span className="text-zinc-500 dark:text-zinc-400">— {r.nombre}</span>
                 {r.descripcion && <span className="block truncate text-zinc-500 dark:text-zinc-400">{r.descripcion}</span>}
               </span>
             </label>
@@ -218,7 +218,7 @@ function CamposPregunta({
   );
 }
 
-function NuevaPreguntaForm({ marcaId, referencias, usuarios }: { marcaId: string; referencias: Referencia[]; usuarios: Usuario[] }) {
+export function NuevaPreguntaForm({ marcaId, referencias, usuarios }: { marcaId: string; referencias: Referencia[]; usuarios: Usuario[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [valores, setValores] = useState(valoresIniciales());
@@ -671,7 +671,6 @@ function agruparPreguntas(preguntas: Pregunta[]): Map<string | null, Map<string 
 }
 
 export default function PreguntasManager({
-  marcaId,
   preguntas,
   referencias,
   usuarios,
@@ -735,7 +734,6 @@ export default function PreguntasManager({
           })}
         </div>
       )}
-      <NuevaPreguntaForm marcaId={marcaId} referencias={referencias} usuarios={usuarios} />
     </div>
   );
 }
