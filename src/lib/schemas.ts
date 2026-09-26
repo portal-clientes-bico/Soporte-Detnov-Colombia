@@ -132,6 +132,7 @@ export const preguntaCamposSchema = z.object({
 export const preguntaSchema = preguntaCamposSchema.extend({
   marcaId: z.string().min(1),
   productos: z.array(z.string().min(1)).optional(),
+  documentos: z.array(z.string().min(1)).optional(),
 });
 
 export const preguntaPatchSchema = preguntaCamposSchema.partial().extend({

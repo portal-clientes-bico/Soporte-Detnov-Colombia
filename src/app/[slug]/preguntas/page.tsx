@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getMarcaPorSlug, getPreguntasDeMarca, getReferenciasDeMarca, getUsuarios } from "@/lib/queries";
+import { getDocumentosDeMarca, getMarcaPorSlug, getPreguntasDeMarca, getReferenciasDeMarca, getUsuarios } from "@/lib/queries";
 import { PREGUNTA_ESTADO_VALUES, PREGUNTA_ESTADOS, PREGUNTA_PRIORIDAD_VALUES, PREGUNTA_PRIORIDADES } from "@/lib/tipos";
 import type { SoportePreguntaEstado, SoportePreguntaPrioridad } from "@/lib/db";
 import PreguntasManager, { NuevaPreguntaForm } from "./preguntas-manager";
@@ -20,10 +20,11 @@ export default async function PreguntasPage({
   const estadoFiltro = sp.estado && PREGUNTA_ESTADO_VALUES.includes(sp.estado as SoportePreguntaEstado) ? (sp.estado as SoportePreguntaEstado) : undefined;
   const asignadoFiltro = sp.asignadoAUsuarioId || undefined;
 
-  const [preguntas, referencias, usuarios] = await Promise.all([
+  const [preguntas, referencias, usuarios, documentos] = await Promise.all([
     getPreguntasDeMarca(marca.id, { prioridad: prioridadFiltro, estado: estadoFiltro, asignadoAUsuarioId: asignadoFiltro }),
     getReferenciasDeMarca(marca.id),
     getUsuarios(),
+    getDocumentosDeMarca(marca.id),
   ]);
 
   const preguntasFiltradas = sp.referencia ? preguntas.filter((p) => p.productos.some((r) => r.referencia === sp.referencia)) : preguntas;
@@ -79,10 +80,10 @@ export default async function PreguntasPage({
             </span>
           )}
         </form>
-        <NuevaPreguntaForm marcaId={marca.id} referencias={referencias} usuarios={usuarios} />
+        <NuevaPreguntaForm marcaId={marca.id} referencias={referencias} usuarios={usuarios} documentos={documentos} />
       </div>
 
-      <PreguntasManager marcaId={marca.id} preguntas={preguntasFiltradas} referencias={referencias} usuarios={usuarios} slug={slug} />
+      <PreguntasManager marcaId={marca.id} preguntas={preguntasFiltradas} referencias={referencias} usuarios={usuarios} documentos={documentos} slug={slug} />
     </div>
   );
 }

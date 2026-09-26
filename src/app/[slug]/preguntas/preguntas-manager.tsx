@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { getPreguntasDeMarca, getReferenciasDeMarca, getUsuarios } from "@/lib/queries";
+import type { getDocumentosDeMarca, getPreguntasDeMarca, getReferenciasDeMarca, getUsuarios } from "@/lib/queries";
 import { ARCHIVO_MAX_BYTES, DOCUMENTO_TIPO_VALUES, DOCUMENTO_TIPOS, ORGANIZACIONES, ORGANIZACION_VALUES, PREGUNTA_PRIORIDADES, PREGUNTA_PRIORIDAD_VALUES } from "@/lib/tipos";
 import { nombreUsuarioActual } from "@/lib/usuario-actual";
 
 type Pregunta = Awaited<ReturnType<typeof getPreguntasDeMarca>>[number];
 type Referencia = Awaited<ReturnType<typeof getReferenciasDeMarca>>[number];
 type Usuario = Awaited<ReturnType<typeof getUsuarios>>[number];
+type DocumentoItem = Awaited<ReturnType<typeof getDocumentosDeMarca>>[number];
 
 const inputClass =
   "w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50";
@@ -155,6 +156,108 @@ function VincularReferenciaBuscador({ referenciasDisponibles, onVincular, loadin
   );
 }
 
+function documentoMatch(d: DocumentoItem, q: string): boolean {
+  return d.titulo.toLowerCase().includes(q) || (d.codigo ?? "").toLowerCase().includes(q) || (d.notas ?? "").toLowerCase().includes(q);
+}
+
+function SelectorDocumentos({
+  documentos,
+  seleccionados,
+  onToggle,
+}: {
+  documentos: DocumentoItem[];
+  seleccionados: string[];
+  onToggle: (id: string) => void;
+}) {
+  const [busqueda, setBusqueda] = useState("");
+  const q = busqueda.trim().toLowerCase();
+  const filtrados = q ? documentos.filter((d) => documentoMatch(d, q)) : documentos;
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar documento..." className={inputClass} />
+      <div className="flex max-h-48 flex-col gap-1 overflow-y-auto rounded-lg border border-zinc-200 p-2 dark:border-zinc-800">
+        {filtrados.length === 0 ? (
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">Sin coincidencias.</p>
+        ) : (
+          filtrados.map((d) => (
+            <label key={d.id} className="flex items-start gap-1.5 text-xs text-zinc-700 dark:text-zinc-300" title={d.notas ?? undefined}>
+              <input type="checkbox" checked={seleccionados.includes(d.id)} onChange={() => onToggle(d.id)} className="mt-0.5 shrink-0" />
+              <span className="min-w-0">
+                <span className="font-medium">{d.titulo}</span>
+                <span className="block truncate text-zinc-500 dark:text-zinc-400">
+                  {[DOCUMENTO_TIPOS[d.tipo], d.codigo].filter(Boolean).join(" · ")}
+                </span>
+              </span>
+            </label>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function VincularDocumentoBuscador({ documentosDisponibles, onVincular, loading }: { documentosDisponibles: DocumentoItem[]; onVincular: (id: string) => void; loading: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [busqueda, setBusqueda] = useState("");
+  const q = busqueda.trim().toLowerCase();
+  const filtrados = q ? documentosDisponibles.filter((d) => documentoMatch(d, q)) : documentosDisponibles;
+
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)} className="self-start text-xs text-zinc-500 underline hover:text-zinc-900 dark:hover:text-zinc-50">
+        + vincular documento existente
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5 rounded-lg border border-zinc-200 p-2 dark:border-zinc-800">
+      <div className="flex items-center gap-2">
+        <input
+          autoFocus
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          placeholder="Buscar documento..."
+          className="w-40 rounded-lg border border-zinc-300 px-2 py-1 text-xs text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
+        />
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(false);
+            setBusqueda("");
+          }}
+          className="text-xs text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50"
+        >
+          Cerrar
+        </button>
+      </div>
+      <div className="flex max-h-40 flex-col gap-1 overflow-y-auto">
+        {filtrados.length === 0 ? (
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">Sin coincidencias.</p>
+        ) : (
+          filtrados.slice(0, 60).map((d) => (
+            <button
+              key={d.id}
+              type="button"
+              disabled={loading}
+              onClick={() => {
+                onVincular(d.id);
+                setBusqueda("");
+              }}
+              title={d.notas ?? undefined}
+              className="flex flex-col items-start rounded-lg bg-zinc-100 px-2 py-1 text-left text-xs text-zinc-700 hover:bg-zinc-200 disabled:opacity-60 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+            >
+              <span className="font-medium">{d.titulo}</span>
+              <span className="w-full truncate text-zinc-500 dark:text-zinc-400">{[DOCUMENTO_TIPOS[d.tipo], d.codigo].filter(Boolean).join(" · ")}</span>
+            </button>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 function archivoUrl(archivoPath: string | null): string | null {
   return archivoPath ? `/api/archivos/${archivoPath}` : null;
 }
@@ -218,11 +321,22 @@ function CamposPregunta({
   );
 }
 
-export function NuevaPreguntaForm({ marcaId, referencias, usuarios }: { marcaId: string; referencias: Referencia[]; usuarios: Usuario[] }) {
+export function NuevaPreguntaForm({
+  marcaId,
+  referencias,
+  usuarios,
+  documentos,
+}: {
+  marcaId: string;
+  referencias: Referencia[];
+  usuarios: Usuario[];
+  documentos: DocumentoItem[];
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [valores, setValores] = useState(valoresIniciales());
   const [productos, setProductos] = useState<string[]>([]);
+  const [documentosSeleccionados, setDocumentosSeleccionados] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -246,7 +360,7 @@ export function NuevaPreguntaForm({ marcaId, referencias, usuarios }: { marcaId:
     const res = await fetch("/api/preguntas", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ marcaId, ...valores, productos }),
+      body: JSON.stringify({ marcaId, ...valores, productos, documentos: documentosSeleccionados }),
     });
     const data = await res.json().catch(() => ({}));
     setLoading(false);
@@ -256,6 +370,7 @@ export function NuevaPreguntaForm({ marcaId, referencias, usuarios }: { marcaId:
     }
     setValores(valoresIniciales());
     setProductos([]);
+    setDocumentosSeleccionados([]);
     setOpen(false);
     router.refresh();
   }
@@ -271,6 +386,16 @@ export function NuevaPreguntaForm({ marcaId, referencias, usuarios }: { marcaId:
             referencias={referencias}
             seleccionadas={productos}
             onToggle={(id) => setProductos((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))}
+          />
+        </div>
+      )}
+      {documentos.length > 0 && (
+        <div>
+          <p className="mb-1 text-sm text-zinc-600 dark:text-zinc-400">Documentos relacionados</p>
+          <SelectorDocumentos
+            documentos={documentos}
+            seleccionados={documentosSeleccionados}
+            onToggle={(id) => setDocumentosSeleccionados((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))}
           />
         </div>
       )}
@@ -387,7 +512,7 @@ function RespuestaPanel({ pregunta }: { pregunta: Pregunta }) {
   );
 }
 
-function ArchivosPanel({ pregunta }: { pregunta: Pregunta }) {
+function ArchivosPanel({ pregunta, documentosDisponibles }: { pregunta: Pregunta; documentosDisponibles: DocumentoItem[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [tipo, setTipo] = useState("OTRO");
@@ -433,6 +558,17 @@ function ArchivosPanel({ pregunta }: { pregunta: Pregunta }) {
     router.refresh();
   }
 
+  async function handleVincularExistente(documentoId: string) {
+    setLoading(true);
+    await fetch(`/api/preguntas/${pregunta.id}/documentos`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ documentoId }),
+    });
+    setLoading(false);
+    router.refresh();
+  }
+
   return (
     <div className="flex flex-col gap-2">
       {pregunta.archivos.length > 0 && (
@@ -457,9 +593,12 @@ function ArchivosPanel({ pregunta }: { pregunta: Pregunta }) {
         </ul>
       )}
       {!open ? (
-        <button type="button" onClick={() => setOpen(true)} className="self-start text-xs text-zinc-500 underline hover:text-zinc-900 dark:hover:text-zinc-50">
-          + Adjuntar archivo a la biblioteca
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="button" onClick={() => setOpen(true)} className="self-start text-xs text-zinc-500 underline hover:text-zinc-900 dark:hover:text-zinc-50">
+            + Adjuntar archivo a la biblioteca
+          </button>
+          {documentosDisponibles.length > 0 && <VincularDocumentoBuscador documentosDisponibles={documentosDisponibles} onVincular={handleVincularExistente} loading={loading} />}
+        </div>
       ) : (
         <form onSubmit={handleSubmit} className="flex flex-col gap-2 rounded-lg border border-zinc-200 p-2 dark:border-zinc-800">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -488,7 +627,7 @@ function ArchivosPanel({ pregunta }: { pregunta: Pregunta }) {
   );
 }
 
-function PreguntaCard({ pregunta, referencias, usuarios }: { pregunta: Pregunta; referencias: Referencia[]; usuarios: Usuario[] }) {
+function PreguntaCard({ pregunta, referencias, usuarios, documentos }: { pregunta: Pregunta; referencias: Referencia[]; usuarios: Usuario[]; documentos: DocumentoItem[] }) {
   const router = useRouter();
   const [editando, setEditando] = useState(false);
   const [valores, setValores] = useState({
@@ -502,6 +641,7 @@ function PreguntaCard({ pregunta, referencias, usuarios }: { pregunta: Pregunta;
   const [error, setError] = useState<string | null>(null);
 
   const referenciasDisponibles = referencias.filter((r) => !pregunta.productos.some((v) => v.id === r.id));
+  const documentosDisponibles = documentos.filter((d) => !pregunta.archivos.some((a) => a.id === d.id));
 
   async function handleSave() {
     setLoading(true);
@@ -639,7 +779,7 @@ function PreguntaCard({ pregunta, referencias, usuarios }: { pregunta: Pregunta;
           {referenciasDisponibles.length > 0 && <VincularReferenciaBuscador referenciasDisponibles={referenciasDisponibles} onVincular={handleVincular} loading={loading} />}
         </div>
 
-        <ArchivosPanel pregunta={pregunta} />
+        <ArchivosPanel pregunta={pregunta} documentosDisponibles={documentosDisponibles} />
 
         {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
       </div>
@@ -674,11 +814,13 @@ export default function PreguntasManager({
   preguntas,
   referencias,
   usuarios,
+  documentos,
 }: {
   marcaId: string;
   preguntas: Pregunta[];
   referencias: Referencia[];
   usuarios: Usuario[];
+  documentos: DocumentoItem[];
   slug: string;
 }) {
   const porOrganizacion = agruparPreguntas(preguntas);
@@ -722,7 +864,7 @@ export default function PreguntasManager({
                         </summary>
                         <div className="flex flex-col gap-2 border-t border-zinc-200 p-3 dark:border-zinc-800">
                           {items.map((p) => (
-                            <PreguntaCard key={p.id} pregunta={p} referencias={referencias} usuarios={usuarios} />
+                            <PreguntaCard key={p.id} pregunta={p} referencias={referencias} usuarios={usuarios} documentos={documentos} />
                           ))}
                         </div>
                       </details>
