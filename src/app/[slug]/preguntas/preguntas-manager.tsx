@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { getPreguntasDeMarca, getReferenciasDeMarca, getUsuarios } from "@/lib/queries";
-import { ARCHIVO_MAX_BYTES, DOCUMENTO_TIPO_VALUES, DOCUMENTO_TIPOS, ORGANIZACIONES, PREGUNTA_PRIORIDADES, PREGUNTA_PRIORIDAD_VALUES } from "@/lib/tipos";
+import { ARCHIVO_MAX_BYTES, DOCUMENTO_TIPO_VALUES, DOCUMENTO_TIPOS, ORGANIZACIONES, ORGANIZACION_VALUES, PREGUNTA_PRIORIDADES, PREGUNTA_PRIORIDAD_VALUES } from "@/lib/tipos";
 import { nombreUsuarioActual } from "@/lib/usuario-actual";
 
 type Pregunta = Awaited<ReturnType<typeof getPreguntasDeMarca>>[number];
@@ -548,62 +548,93 @@ function PreguntaCard({ pregunta, referencias, usuarios }: { pregunta: Pregunta;
   }
 
   return (
-    <div className={`flex flex-col gap-3 rounded-xl border p-4 ${pregunta.estado === "CERRADA" ? "border-zinc-100 bg-zinc-50 opacity-80 dark:border-zinc-800/60 dark:bg-zinc-900/40" : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"}`}>
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className={`rounded-full px-2 py-0.5 text-xs ${prioridadBadge[pregunta.prioridad]}`}>Prioridad {PREGUNTA_PRIORIDADES[pregunta.prioridad]}</span>
-            <span className={`rounded-full px-2 py-0.5 text-xs ${pregunta.estado === "ABIERTA" ? "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300" : "bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300"}`}>
-              {pregunta.estado === "ABIERTA" ? "Abierta" : "Cerrada"}
-            </span>
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs ${pregunta.organizacion ? organizacionBadge[pregunta.organizacion] : SIN_ASIGNAR_BADGE}`}
-              title="Se consulta a partir del usuario asignado (campo 'Asignado a')"
-            >
-              {pregunta.organizacion ? ORGANIZACIONES[pregunta.organizacion] : "Sin organizacion"}
-            </span>
-            <p className="font-medium">{pregunta.titulo}</p>
+    <details
+      className={`group rounded-xl border ${pregunta.estado === "CERRADA" ? "border-zinc-100 bg-zinc-50 opacity-80 dark:border-zinc-800/60 dark:bg-zinc-900/40" : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"}`}
+    >
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 select-none marker:content-none">
+        <span className="inline-block shrink-0 text-zinc-400 transition-transform group-open:rotate-90">▶</span>
+        <p className="font-medium">{pregunta.titulo}</p>
+      </summary>
+
+      <div className="flex flex-col gap-3 px-4 pb-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`rounded-full px-2 py-0.5 text-xs ${prioridadBadge[pregunta.prioridad]}`}>Prioridad {PREGUNTA_PRIORIDADES[pregunta.prioridad]}</span>
+              <span className={`rounded-full px-2 py-0.5 text-xs ${pregunta.estado === "ABIERTA" ? "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300" : "bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300"}`}>
+                {pregunta.estado === "ABIERTA" ? "Abierta" : "Cerrada"}
+              </span>
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs ${pregunta.organizacion ? organizacionBadge[pregunta.organizacion] : SIN_ASIGNAR_BADGE}`}
+                title="Se consulta a partir del usuario asignado (campo 'Asignado a')"
+              >
+                {pregunta.organizacion ? ORGANIZACIONES[pregunta.organizacion] : "Sin organizacion"}
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              Preguntó {pregunta.autor} · {formatFechaHora(pregunta.createdAt)}
+              {pregunta.fechaCierre ? ` · Cerrada ${formatFechaHora(pregunta.fechaCierre)}` : ""}
+              {pregunta.asignadoNombre ? ` · Asignado a ${pregunta.asignadoNombre}` : ""}
+            </p>
           </div>
-          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-            Preguntó {pregunta.autor} · {formatFechaHora(pregunta.createdAt)}
-            {pregunta.fechaCierre ? ` · Cerrada ${formatFechaHora(pregunta.fechaCierre)}` : ""}
-            {pregunta.asignadoNombre ? ` · Asignado a ${pregunta.asignadoNombre}` : ""}
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-3 text-xs">
-          <button type="button" onClick={toggleEstado} disabled={loading} className="text-zinc-500 underline hover:text-zinc-900 disabled:opacity-60 dark:hover:text-zinc-50">
-            {pregunta.estado === "ABIERTA" ? "Cerrar pregunta" : "Reabrir"}
-          </button>
-          <button type="button" onClick={() => setEditando(true)} className="text-zinc-500 underline hover:text-zinc-900 dark:hover:text-zinc-50">
-            Editar
-          </button>
-          <button type="button" onClick={handleDelete} disabled={loading} className="text-red-600 underline hover:text-red-800 disabled:opacity-60 dark:text-red-400">
-            Borrar
-          </button>
-        </div>
-      </div>
-
-      <p className="text-sm text-zinc-700 dark:text-zinc-300">{pregunta.contenido}</p>
-
-      <RespuestaPanel pregunta={pregunta} />
-
-      <div className="flex flex-wrap items-center gap-1.5">
-        {pregunta.productos.map((r) => (
-          <span key={r.id} className="flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-            {r.referencia}
-            <button type="button" onClick={() => handleDesvincular(r.id)} disabled={loading} className="text-zinc-400 hover:text-red-600 dark:hover:text-red-400">
-              ×
+          <div className="flex shrink-0 items-center gap-3 text-xs">
+            <button type="button" onClick={toggleEstado} disabled={loading} className="text-zinc-500 underline hover:text-zinc-900 disabled:opacity-60 dark:hover:text-zinc-50">
+              {pregunta.estado === "ABIERTA" ? "Cerrar pregunta" : "Reabrir"}
             </button>
-          </span>
-        ))}
-        {referenciasDisponibles.length > 0 && <VincularReferenciaBuscador referenciasDisponibles={referenciasDisponibles} onVincular={handleVincular} loading={loading} />}
+            <button type="button" onClick={() => setEditando(true)} className="text-zinc-500 underline hover:text-zinc-900 dark:hover:text-zinc-50">
+              Editar
+            </button>
+            <button type="button" onClick={handleDelete} disabled={loading} className="text-red-600 underline hover:text-red-800 disabled:opacity-60 dark:text-red-400">
+              Borrar
+            </button>
+          </div>
+        </div>
+
+        <p className="text-sm text-zinc-700 dark:text-zinc-300">{pregunta.contenido}</p>
+
+        <RespuestaPanel pregunta={pregunta} />
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          {pregunta.productos.map((r) => (
+            <span key={r.id} className="flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+              {r.referencia}
+              <button type="button" onClick={() => handleDesvincular(r.id)} disabled={loading} className="text-zinc-400 hover:text-red-600 dark:hover:text-red-400">
+                ×
+              </button>
+            </span>
+          ))}
+          {referenciasDisponibles.length > 0 && <VincularReferenciaBuscador referenciasDisponibles={referenciasDisponibles} onVincular={handleVincular} loading={loading} />}
+        </div>
+
+        <ArchivosPanel pregunta={pregunta} />
+
+        {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
       </div>
-
-      <ArchivosPanel pregunta={pregunta} />
-
-      {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
-    </div>
+    </details>
   );
+}
+
+const ORDEN_ORGANIZACION: Record<string, number> = Object.fromEntries(ORGANIZACION_VALUES.map((o, i) => [o, i]));
+function ordenOrganizacion(org: string | null): number {
+  if (!org) return ORGANIZACION_VALUES.length; // "Sin organizacion" al final
+  return ORDEN_ORGANIZACION[org] ?? ORGANIZACION_VALUES.length;
+}
+function labelOrganizacion(org: string | null): string {
+  return org ? ORGANIZACIONES[org as keyof typeof ORGANIZACIONES] : "Sin organización";
+}
+
+/** Agrupa por Organizacion (calculada desde el usuario asignado) y, dentro de cada una, por
+ * la persona asignada -- misma logica de agrupamiento desplegable que Referencias
+ * (Generacion -> Familia) y Documentos. */
+function agruparPreguntas(preguntas: Pregunta[]): Map<string | null, Map<string | null, Pregunta[]>> {
+  const porOrganizacion = new Map<string | null, Map<string | null, Pregunta[]>>();
+  for (const p of preguntas) {
+    if (!porOrganizacion.has(p.organizacion)) porOrganizacion.set(p.organizacion, new Map());
+    const porAsignado = porOrganizacion.get(p.organizacion)!;
+    if (!porAsignado.has(p.asignadoNombre)) porAsignado.set(p.asignadoNombre, []);
+    porAsignado.get(p.asignadoNombre)!.push(p);
+  }
+  return porOrganizacion;
 }
 
 export default function PreguntasManager({
@@ -618,12 +649,58 @@ export default function PreguntasManager({
   usuarios: Usuario[];
   slug: string;
 }) {
+  const porOrganizacion = agruparPreguntas(preguntas);
+  const organizacionesOrdenadas = [...porOrganizacion.keys()].sort((a, b) => ordenOrganizacion(a) - ordenOrganizacion(b));
+
   return (
     <div className="flex flex-col gap-4">
       {preguntas.length === 0 ? (
         <p className="text-sm text-zinc-500 dark:text-zinc-400">Ninguna pregunta coincide con el filtro.</p>
       ) : (
-        preguntas.map((p) => <PreguntaCard key={p.id} pregunta={p} referencias={referencias} usuarios={usuarios} />)
+        <div className="flex flex-col gap-3">
+          {organizacionesOrdenadas.map((org) => {
+            const porAsignado = porOrganizacion.get(org)!;
+            const asignadosOrdenados = [...porAsignado.keys()].sort((a, b) => {
+              if (a === b) return 0;
+              if (a === null) return 1; // "Sin asignar" al final
+              if (b === null) return -1;
+              return a.localeCompare(b);
+            });
+            const totalOrganizacion = [...porAsignado.values()].reduce((sum, arr) => sum + arr.length, 0);
+            return (
+              <details key={org ?? "sin-organizacion"} open className="group rounded-xl border border-zinc-200 bg-zinc-50/50 dark:border-zinc-800 dark:bg-zinc-900/20">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-xl px-4 py-3 select-none marker:content-none">
+                  <span className="flex items-center gap-2 text-base font-semibold">
+                    <span className="inline-block text-zinc-400 transition-transform group-open:rotate-90">▶</span>
+                    {labelOrganizacion(org)}
+                  </span>
+                  <span className="rounded-full bg-zinc-200 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">{totalOrganizacion}</span>
+                </summary>
+                <div className="flex flex-col gap-3 p-4 pt-0">
+                  {asignadosOrdenados.map((asignado) => {
+                    const items = porAsignado.get(asignado)!;
+                    return (
+                      <details key={asignado ?? "sin-asignar"} open className="group rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+                        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-3 py-2 select-none marker:content-none">
+                          <span className="flex items-center gap-2 text-sm font-medium">
+                            <span className="inline-block text-zinc-400 transition-transform group-open:rotate-90">▶</span>
+                            {asignado ?? "Sin asignar"}
+                          </span>
+                          <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">{items.length}</span>
+                        </summary>
+                        <div className="flex flex-col gap-2 border-t border-zinc-200 p-3 dark:border-zinc-800">
+                          {items.map((p) => (
+                            <PreguntaCard key={p.id} pregunta={p} referencias={referencias} usuarios={usuarios} />
+                          ))}
+                        </div>
+                      </details>
+                    );
+                  })}
+                </div>
+              </details>
+            );
+          })}
+        </div>
       )}
       <NuevaPreguntaForm marcaId={marcaId} referencias={referencias} usuarios={usuarios} />
     </div>
