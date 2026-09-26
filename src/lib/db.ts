@@ -17,6 +17,9 @@ export const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
 /** Texto extraido de los archivos confirmados, para el ChatBot. Un JSON por documento
  * (paginado), nunca contenido subido directamente por un usuario. */
 export const TEXTO_EXTRAIDO_DIR = path.join(DATA_DIR, "uploads-texto");
+/** Vectores de embedding (busqueda semantica local) calculados sobre el texto extraido, uno
+ * por pagina. Ver src/lib/embeddings.ts. */
+export const EMBEDDINGS_DIR = path.join(DATA_DIR, "uploads-embeddings");
 
 export type SoporteFuenteTipo =
   | "FABRICANTE"
@@ -129,6 +132,9 @@ export interface Documento {
    * intentado, o no aplica: sin archivo, tipo no soportado, o confianza distinta de
    * CONFIRMADO). Ver src/lib/extraccion-texto.ts. */
   textoExtraidoEn: string | null;
+  /** Fecha en que se calcularon los vectores de embedding sobre el texto extraido (null =
+   * aun no aplica: requiere textoExtraidoEn). Ver src/lib/embeddings.ts. */
+  embeddingsGeneradasEn: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -270,6 +276,7 @@ async function asegurarCarpetas(): Promise<void> {
   await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.mkdir(UPLOADS_DIR, { recursive: true });
   await fs.mkdir(TEXTO_EXTRAIDO_DIR, { recursive: true });
+  await fs.mkdir(EMBEDDINGS_DIR, { recursive: true });
 }
 
 /** Lee el archivo completo. Si no existe todavia, lo crea vacio. */

@@ -1,6 +1,7 @@
 import "server-only";
 import { leerDb } from "@/lib/db";
 import { leerTextoDocumento } from "@/lib/extraccion-texto";
+import { leerEmbeddingsDocumento } from "@/lib/embeddings";
 import type {
   Compatibilidad,
   Documento,
@@ -342,6 +343,7 @@ export async function getContextoChatbot(marcaId: string) {
           .map((dp) => db.productos.find((p) => p.id === dp.productoId)?.referencia)
           .filter((r): r is string => !!r);
         const extraido = d.textoExtraidoEn ? await leerTextoDocumento(d.id) : null;
+        const embeddings = d.embeddingsGeneradasEn ? await leerEmbeddingsDocumento(d.id) : null;
         return {
           titulo: d.titulo,
           tipo: d.tipo,
@@ -353,6 +355,9 @@ export async function getContextoChatbot(marcaId: string) {
           fuente: fuente?.nombre ?? null,
           referencias,
           paginas: extraido?.paginas ?? null,
+          // Vectores de embedding por pagina (busqueda semantica local), mismo orden/indices
+          // que "paginas". null si el documento aun no los tiene (ver src/lib/embeddings.ts).
+          vectoresPaginas: embeddings?.vectores ?? null,
         };
       }),
   );
@@ -373,7 +378,19 @@ export async function getContextoChatbot(marcaId: string) {
       };
     });
 
-  return { productos, documentosConfirmados, preguntasCerradas };
+  // Hallazgos declarados como "Hallazgo / aprendizaje" (ver HALLAZGO_TIPOS en tipos.ts):
+  // conocimiento confirmado util para soporte/capacitacion, a diferencia de REGLA (criterio
+  // interno de mantenimiento de la base), DISCREPANCIA o PENDIENTE. El estado ABIERTO/RESUELTO
+  // de un hallazgo es seguimiento de trabajo, no confiabilidad -- no se filtra por eso.
+  const aprendizajes = db.hallazgos
+    .filter((h) => h.marcaId === marcaId && h.tipo === "HALLAZGO")
+    .map((h) => ({
+      titulo: h.titulo,
+      contenido: h.contenido,
+      referencia: h.productoId ? (db.productos.find((p) => p.id === h.productoId)?.referencia ?? null) : null,
+    }));
+
+  return { productos, documentosConfirmados, preguntasCerradas, aprendizajes };
 }
 
 /** Contador acumulado de uso de la API del ChatBot (ver db.ts: UsoChatbot). */

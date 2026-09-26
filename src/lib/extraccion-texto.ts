@@ -4,6 +4,7 @@ import path from "path";
 import { PDFParse } from "pdf-parse";
 import * as pdfjsWorker from "pdfjs-dist/legacy/build/pdf.worker.mjs";
 import { TEXTO_EXTRAIDO_DIR, UPLOADS_DIR, ahora, type Documento } from "@/lib/db";
+import { generarYGuardarEmbeddings } from "@/lib/embeddings";
 
 /**
  * pdf-parse (via pdfjs-dist) intenta cargar su "worker" con un import() dinamico cuyo argumento
@@ -71,26 +72,36 @@ export async function borrarTextoDocumento(documentoId: string): Promise<void> {
   await fs.unlink(rutaTextoDocumento(documentoId)).catch(() => {});
 }
 
+export interface ResultadoExtraccion {
+  textoExtraidoEn: string | null;
+  embeddingsGeneradasEn: string | null;
+}
+
 /**
  * Si el documento aplica (confianza CONFIRMADO, tiene archivo local, tipo soportado),
- * extrae su texto y lo guarda. Devuelve la fecha de extraccion para que el caller la
- * escriba en documento.textoExtraidoEn, o null si no aplico o fallo (no lanza excepcion:
- * la extraccion es una mejora, nunca debe tumbar la operacion principal -- crear/actualizar
- * el documento).
+ * extrae su texto, lo guarda y de una vez calcula sus vectores de embedding (busqueda
+ * semantica local, ver src/lib/embeddings.ts) -- el caller escribe ambas fechas en
+ * documento.textoExtraidoEn / embeddingsGeneradasEn. Ninguno de los dos pasos lanza
+ * excepcion: son mejoras sobre la operacion principal (crear/actualizar el documento), que
+ * nunca deben tumbarla.
  */
-export async function extraerYGuardarSiCorresponde(documento: Pick<Documento, "id" | "confianza" | "archivoPath">): Promise<string | null> {
-  if (documento.confianza !== "CONFIRMADO") return null;
-  if (!documento.archivoPath) return null;
-  if (!extensionSoportada(documento.archivoPath)) return null;
+export async function extraerYGuardarSiCorresponde(documento: Pick<Documento, "id" | "confianza" | "archivoPath">): Promise<ResultadoExtraccion> {
+  const nada: ResultadoExtraccion = { textoExtraidoEn: null, embeddingsGeneradasEn: null };
+  if (documento.confianza !== "CONFIRMADO") return nada;
+  if (!documento.archivoPath) return nada;
+  if (!extensionSoportada(documento.archivoPath)) return nada;
 
+  let paginas: PaginaExtraida[];
   try {
     const rutaCompleta = path.join(UPLOADS_DIR, documento.archivoPath);
-    const paginas = await extraerPdf(rutaCompleta);
-    if (paginas.length === 0) return null; // probablemente un PDF escaneado sin capa de texto
+    paginas = await extraerPdf(rutaCompleta);
+    if (paginas.length === 0) return nada; // probablemente un PDF escaneado sin capa de texto
     await guardarTextoDocumento(documento.id, paginas);
-    return ahora();
   } catch (error) {
     console.error(`No se pudo extraer texto de documento ${documento.id} (${documento.archivoPath}):`, error);
-    return null;
+    return nada;
   }
+
+  const embeddingsGeneradasEn = await generarYGuardarEmbeddings(documento.id, paginas);
+  return { textoExtraidoEn: ahora(), embeddingsGeneradasEn };
 }

@@ -3,6 +3,7 @@ import { mutarDb, ahora } from "@/lib/db";
 import { documentoCamposSchema } from "@/lib/schemas";
 import { borrarArchivo } from "@/lib/storage";
 import { borrarTextoDocumento, extraerYGuardarSiCorresponde } from "@/lib/extraccion-texto";
+import { borrarEmbeddingsDocumento } from "@/lib/embeddings";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -22,13 +23,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   if (!actualizado) return NextResponse.json({ error: "Documento no encontrado" }, { status: 404 });
 
-  // Si la confianza acaba de pasar a CONFIRMADO (o nunca se habia intentado), extraer texto.
+  // Si la confianza acaba de pasar a CONFIRMADO (o nunca se habia intentado), extraer texto
+  // y generar embeddings para el ChatBot.
   if (!actualizado.textoExtraidoEn) {
-    const extraidoEn = await extraerYGuardarSiCorresponde(actualizado);
-    if (extraidoEn) {
+    const resultado = await extraerYGuardarSiCorresponde(actualizado);
+    if (resultado.textoExtraidoEn) {
       await mutarDb((db) => {
         const doc = db.documentos.find((d) => d.id === id);
-        if (doc) doc.textoExtraidoEn = extraidoEn;
+        if (doc) {
+          doc.textoExtraidoEn = resultado.textoExtraidoEn;
+          doc.embeddingsGeneradasEn = resultado.embeddingsGeneradasEn;
+        }
       });
     }
   }
@@ -51,5 +56,6 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   if (archivoPath === undefined) return NextResponse.json({ error: "Documento no encontrado" }, { status: 404 });
   await borrarArchivo(archivoPath);
   await borrarTextoDocumento(id);
+  await borrarEmbeddingsDocumento(id);
   return NextResponse.json({ ok: true });
 }

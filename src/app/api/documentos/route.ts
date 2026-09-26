@@ -57,6 +57,7 @@ export async function POST(request: Request) {
       archivoNombre: guardado?.nombreArchivo ?? null,
       archivoPath: guardado?.archivoPath ?? null,
       textoExtraidoEn: null,
+      embeddingsGeneradasEn: null,
       createdAt: now,
       updatedAt: now,
     });
@@ -68,12 +69,15 @@ export async function POST(request: Request) {
     return nuevoDocId;
   });
 
-  // Extraccion de texto para el ChatBot: intento aparte, nunca hace fallar la creacion.
-  const extraidoEn = await extraerYGuardarSiCorresponde({ id, confianza: parsed.data.confianza, archivoPath: guardado?.archivoPath ?? null });
-  if (extraidoEn) {
+  // Extraccion de texto + embeddings para el ChatBot: intento aparte, nunca hace fallar la creacion.
+  const resultado = await extraerYGuardarSiCorresponde({ id, confianza: parsed.data.confianza, archivoPath: guardado?.archivoPath ?? null });
+  if (resultado.textoExtraidoEn) {
     await mutarDb((db) => {
       const doc = db.documentos.find((d) => d.id === id);
-      if (doc) doc.textoExtraidoEn = extraidoEn;
+      if (doc) {
+        doc.textoExtraidoEn = resultado.textoExtraidoEn;
+        doc.embeddingsGeneradasEn = resultado.embeddingsGeneradasEn;
+      }
     });
   }
 

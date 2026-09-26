@@ -1,11 +1,13 @@
 import "server-only";
 import type { getContextoChatbot } from "@/lib/queries";
 import { labelFamilia } from "@/lib/tipos";
+import { embederPregunta, similitudCoseno } from "@/lib/embeddings";
 
 type Contexto = Awaited<ReturnType<typeof getContextoChatbot>>;
 type ProductoCtx = Contexto["productos"][number];
 type DocumentoCtx = Contexto["documentosConfirmados"][number];
 type PreguntaCtx = Contexto["preguntasCerradas"][number];
+type AprendizajeCtx = Contexto["aprendizajes"][number];
 type PaginaCtx = NonNullable<DocumentoCtx["paginas"]>[number];
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
@@ -112,6 +114,21 @@ const PESO_REFERENCIA_RELEVANTE = 4;
  * respuesta, solo por mencionar "panel" en casi todas sus paginas). */
 const PESO_MEJOR_PAGINA = 3;
 
+// --------------------------------------------------- Busqueda semantica local (embeddings)
+// Complementa el filtro por palabras clave para preguntas que no comparten ninguna palabra
+// literal con el documento correcto -- el caso mas comun es una pregunta en español sobre un
+// documento en ingles (ver src/lib/embeddings.ts para el detalle y las pruebas que motivaron
+// esto). Los umbrales de abajo salen de pruebas manuales propias (no de un benchmark), y son
+// el primer lugar a ajustar si la busqueda semantica resulta muy laxa o muy estricta en uso
+// real.
+/** Similitud coseno minima para considerar una pagina "relevante por semantica" cuando no
+ * comparte ninguna palabra clave literal -- por debajo de esto, para este modelo, la similitud
+ * suele ser ruido de fondo (paginas del mismo documento/dominio sin relacion real). */
+const UMBRAL_SEMANTICO_MINIMO = 0.76;
+/** Peso de la similitud semantica de la mejor pagina en el puntaje del documento, en la misma
+ * escala que PESO_TITULO/PESO_REFERENCIA_RELEVANTE (una similitud de 0.8 aporta ~8 puntos). */
+const PESO_SEMANTICO = 10;
+
 /** Quita lineas de encabezado/pie repetitivas (paginacion, revision) antes de buscar
  * coincidencias, para que los extractos no desperdicien caracteres en ese boilerplate. */
 function limpiarTextoPagina(texto: string): string {
@@ -131,35 +148,60 @@ function limpiarTextoPagina(texto: string): string {
     .trim();
 }
 
+interface PaginaCandidata {
+  pagina: PaginaCtx;
+  distintas: number;
+  similitud: number;
+  /** true si califico solo por similitud semantica (cero palabras clave literales) -- se usa
+   * despues para no intentar centrar una ventana de texto en una posicion de palabra que no
+   * existe, y para avisarle al modelo que el fragmento es una coincidencia semantica, no
+   * literal. */
+  soloSemantica: boolean;
+}
+
 interface DocumentoPuntuado {
   documento: DocumentoCtx;
   score: number;
-  paginasCoincidentes: PaginaCtx[];
+  paginasCoincidentes: PaginaCandidata[];
 }
 
-function puntuarDocumento(d: DocumentoCtx, palabras: string[], referenciasRelevantes: Set<string>): DocumentoPuntuado {
+function puntuarDocumento(d: DocumentoCtx, palabras: string[], referenciasRelevantes: Set<string>, vectorPregunta: number[] | null): DocumentoPuntuado {
   let score = contarPalabrasDistintas(d.titulo, palabras) * PESO_TITULO;
   score += contarPalabrasDistintas(d.codigo, palabras) * PESO_CODIGO;
   score += contarPalabrasDistintas(d.notas, palabras) * PESO_NOTAS;
   if (d.referencias.some((r) => referenciasRelevantes.has(r))) score += PESO_REFERENCIA_RELEVANTE;
 
-  // Ordena las paginas del documento por cuantas palabras clave distintas tienen (la mas densa
-  // primero), no por numero de pagina: al extraer despues solo unas pocas (MAX_PAGINAS_POR_
-  // DOCUMENTO), asi se quedan las paginas realmente mas relacionadas y no las primeras que
-  // aparecen en el archivo.
-  const paginasConPuntaje = (d.paginas ?? [])
-    .map((p) => ({ pagina: p, distintas: contarPalabrasDistintas(p.texto, palabras) }))
-    .filter((x) => x.distintas > 0)
-    .sort((a, b) => b.distintas - a.distintas);
+  const vectores = d.vectoresPaginas;
 
-  score += (paginasConPuntaje[0]?.distintas ?? 0) * PESO_MEJOR_PAGINA;
+  // Para cada pagina calcula dos señales independientes: cuantas palabras clave literales
+  // tiene, y (si hay vector de embedding para esa pagina) que tan semanticamente parecida es
+  // a la pregunta -- esto ultimo encuentra paginas relevantes aunque no compartan ninguna
+  // palabra literal con la pregunta (ver comentario de UMBRAL_SEMANTICO_MINIMO arriba).
+  const paginasConPuntaje: PaginaCandidata[] = (d.paginas ?? []).map((p, i) => {
+    const distintas = contarPalabrasDistintas(p.texto, palabras);
+    const similitud = vectorPregunta && vectores?.[i] ? similitudCoseno(vectorPregunta, vectores[i]) : 0;
+    return { pagina: p, distintas, similitud, soloSemantica: distintas === 0 };
+  });
 
-  return { documento: d, score, paginasCoincidentes: paginasConPuntaje.map((x) => x.pagina) };
+  // Ordena por el puntaje combinado (palabras clave + semantica), no por numero de pagina: al
+  // extraer despues solo unas pocas (MAX_PAGINAS_POR_DOCUMENTO), asi se quedan las paginas
+  // realmente mas relacionadas y no las primeras que aparecen en el archivo.
+  const puntajePagina = (x: Pick<PaginaCandidata, "distintas" | "similitud">) =>
+    x.distintas * PESO_MEJOR_PAGINA + (x.similitud >= UMBRAL_SEMANTICO_MINIMO ? x.similitud * PESO_SEMANTICO : 0);
+  const candidatas = paginasConPuntaje.filter((x) => x.distintas > 0 || x.similitud >= UMBRAL_SEMANTICO_MINIMO).sort((a, b) => puntajePagina(b) - puntajePagina(a));
+
+  score += candidatas[0] ? puntajePagina(candidatas[0]) : 0;
+
+  return { documento: d, score, paginasCoincidentes: candidatas };
 }
 
 interface Extracto {
   pagina: number;
   texto: string;
+  /** true si esta pagina no comparte ninguna palabra clave literal con la pregunta y se
+   * incluyo solo por similitud semantica -- el modelo debe saber que el fragmento puede no
+   * mencionar los terminos exactos de la pregunta aunque hable del mismo tema. */
+  soloSemantica: boolean;
 }
 
 /** Encuentra donde aparece cada palabra clave en la pagina (ya limpia) y devuelve ventanas de
@@ -214,11 +256,12 @@ function seleccionarDocumentosConExtractos(
   documentos: DocumentoCtx[],
   palabras: string[],
   referenciasRelevantes: Set<string>,
+  vectorPregunta: number[] | null,
 ): { seleccionados: DocumentoConExtracto[]; documentosConsiderados: number } {
   if (palabras.length === 0) return { seleccionados: [], documentosConsiderados: 0 };
 
   const puntuados = documentos
-    .map((d) => puntuarDocumento(d, palabras, referenciasRelevantes))
+    .map((d) => puntuarDocumento(d, palabras, referenciasRelevantes, vectorPregunta))
     .filter((p) => p.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, MAX_DOCUMENTOS_CON_EXTRACTO);
@@ -232,12 +275,17 @@ function seleccionarDocumentosConExtractos(
     if (paginasCoincidentes.length > 0) {
       const paginasUsadas = paginasCoincidentes.slice(0, MAX_PAGINAS_POR_DOCUMENTO);
       const extractos: Extracto[] = [];
-      for (const pagina of paginasUsadas) {
+      for (const { pagina, soloSemantica } of paginasUsadas) {
         if (presupuesto <= 0) break;
-        for (const texto of extraerVentanas(pagina.texto, palabras)) {
+        // Las ventanas se centran en la posicion de una palabra clave literal: una pagina que
+        // solo califico por semantica no tiene esa posicion, asi que en vez de una ventana se
+        // toma un tramo inicial de la pagina (limpia de encabezados/pies).
+        const ventanas = soloSemantica ? [] : extraerVentanas(pagina.texto, palabras);
+        const fragmentos = ventanas.length > 0 ? ventanas : [limpiarTextoPagina(pagina.texto).slice(0, VENTANA_RADIO * 2)];
+        for (const texto of fragmentos) {
           if (presupuesto <= 0) break;
           const recortado = texto.length > presupuesto ? `${texto.slice(0, presupuesto)}...` : texto;
-          extractos.push({ pagina: pagina.numero, texto: recortado });
+          extractos.push({ pagina: pagina.numero, texto: recortado, soloSemantica });
           presupuesto -= recortado.length;
         }
       }
@@ -253,7 +301,7 @@ function seleccionarDocumentosConExtractos(
       const largo = Math.min(CHARS_RESUMEN_FALLBACK, presupuesto);
       if (largo <= 0) continue;
       const texto = limpio.length > largo ? `${limpio.slice(0, largo)}...` : limpio;
-      seleccionados.push({ documento, modo: "resumen", extractos: [{ pagina: primeraPagina.numero, texto }], paginasOmitidas: (documento.paginas?.length ?? 1) - 1 });
+      seleccionados.push({ documento, modo: "resumen", extractos: [{ pagina: primeraPagina.numero, texto, soloSemantica: false }], paginasOmitidas: (documento.paginas?.length ?? 1) - 1 });
       presupuesto -= texto.length;
     }
   }
@@ -276,7 +324,7 @@ interface ContextoFiltrado {
   preguntasOmitidas: number;
 }
 
-function filtrarContexto(pregunta: string, contexto: Contexto): ContextoFiltrado {
+async function filtrarContexto(pregunta: string, contexto: Contexto): Promise<ContextoFiltrado> {
   const palabras = extraerPalabrasClave(pregunta);
   if (palabras.length === 0) {
     return {
@@ -288,10 +336,20 @@ function filtrarContexto(pregunta: string, contexto: Contexto): ContextoFiltrado
     };
   }
 
+  // Busqueda semantica: best-effort. Si el modelo local falla por cualquier razon (primera
+  // carga sin internet para descargarlo, error de runtime, etc.) se sigue solo con el filtro
+  // por palabras clave, exactamente el comportamiento de antes de tener embeddings.
+  let vectorPregunta: number[] | null = null;
+  try {
+    vectorPregunta = await embederPregunta(pregunta);
+  } catch (error) {
+    console.error("No se pudo calcular el embedding de la pregunta (se sigue solo con palabras clave):", error);
+  }
+
   const productosRelevantes = contexto.productos.filter((p) => productoRelevante(p, palabras));
   const referenciasRelevantes = new Set(productosRelevantes.map((p) => p.referencia));
 
-  const { seleccionados, documentosConsiderados } = seleccionarDocumentosConExtractos(contexto.documentosConfirmados, palabras, referenciasRelevantes);
+  const { seleccionados, documentosConsiderados } = seleccionarDocumentosConExtractos(contexto.documentosConfirmados, palabras, referenciasRelevantes, vectorPregunta);
 
   const preguntasRelevantesTodas = contexto.preguntasCerradas.filter((p) => preguntaRelevante(p, palabras, referenciasRelevantes));
   const preguntasRelevantes = preguntasRelevantesTodas.slice(0, MAX_PREGUNTAS_RELEVANTES);
@@ -353,6 +411,16 @@ function formatearPreguntasIndice(preguntas: PreguntaCtx[]): string {
   return preguntas.map((p) => `- "${p.titulo}"${p.referencias.length > 0 ? ` (${p.referencias.join(", ")})` : ""}`).join("\n");
 }
 
+/** Hallazgos declarados como "Hallazgo / aprendizaje" (ver getContextoChatbot): conocimiento
+ * confirmado, en general, no ligado a una sola pregunta -- por eso va completo en el bloque
+ * cacheado (como el catalogo) en vez de filtrarse por pregunta. */
+function formatearAprendizajes(aprendizajes: AprendizajeCtx[]): string {
+  if (aprendizajes.length === 0) return "(sin hallazgos/aprendizajes registrados todavia)";
+  return aprendizajes
+    .map((a) => `- "${a.titulo}"${a.referencia ? ` (${a.referencia})` : ""}: ${a.contenido}`)
+    .join("\n");
+}
+
 function formatearDocumentosConExtracto(seleccionados: DocumentoConExtracto[]): string {
   if (seleccionados.length === 0) return "(ningun documento parecio tener contenido puntual relacionado con esta pregunta)";
   return seleccionados
@@ -360,7 +428,8 @@ function formatearDocumentosConExtracto(seleccionados: DocumentoConExtracto[]): 
       const encabezado = modo === "coincidencia" ? "Fragmentos que mencionan la pregunta" : "Vistazo del documento (su contenido no coincidio con palabras clave puntuales)";
       const partes = [`- "${documento.titulo}" -- ${encabezado}:`];
       for (const extracto of extractos) {
-        partes.push(`    [pagina ${extracto.pagina}] ${extracto.texto}`);
+        const marca = extracto.soloSemantica ? " (coincidencia semantica: puede no usar las mismas palabras de la pregunta)" : "";
+        partes.push(`    [pagina ${extracto.pagina}]${marca} ${extracto.texto}`);
       }
       if (paginasOmitidas > 0) partes.push(`    (hay ${paginasOmitidas} pagina(s) adicional(es) de este documento no incluidas aqui por espacio)`);
       return partes.join("\n");
@@ -390,11 +459,11 @@ function formatearPreguntasDetalle(preguntas: PreguntaCtx[]): string {
 function construirBloqueEstatico(marcaNombre: string, contexto: Contexto): string {
   return [
     `Eres el asistente tecnico interno de Detnov Colombia para el soporte de la marca "${marcaNombre}".`,
-    "Responde SOLO con base en la informacion suministrada (catalogo de referencias, documentos con confianza CONFIRMADO, y preguntas de soporte ya cerradas con respuesta). No inventes especificaciones, precios ni referencias que no esten en esta informacion.",
-    "IMPORTANTE: para cada documento ves su metadata (titulo, tipo, notas) siempre, pero el contenido real del archivo (cuando existe texto extraido -- hoy solo PDF; Excel, escaneados y archivos sin descargar no lo tienen) solo aparece mas abajo para los documentos que parecieron relacionados con la pregunta especifica, y no es el archivo completo: son fragmentos (paginas que mencionan la pregunta, o un vistazo inicial si ninguna coincidio puntualmente). Si un dato puntual (un valor exacto, un procedimiento, una cifra) no aparece en los fragmentos incluidos, di que no esta capturado en lo que tienes disponible y que hay que abrir el documento original (menciona cual, por titulo) para confirmarlo -- no asumas que 'no existe' en el documento, solo que no esta en el fragmento que se te dio.",
+    "Responde SOLO con base en la informacion suministrada (catalogo de referencias, documentos con confianza CONFIRMADO, preguntas de soporte ya cerradas con respuesta, y hallazgos/aprendizajes confirmados). No inventes especificaciones, precios ni referencias que no esten en esta informacion.",
+    "IMPORTANTE: para cada documento ves su metadata (titulo, tipo, notas) siempre, pero el contenido real del archivo (cuando existe texto extraido -- hoy solo PDF; Excel, escaneados y archivos sin descargar no lo tienen) solo aparece mas abajo para los documentos que parecieron relacionados con la pregunta especifica, y no es el archivo completo: son fragmentos (paginas que mencionan la pregunta, o un vistazo inicial si ninguna coincidio puntualmente). Algunos fragmentos se marcan como 'coincidencia semantica': se encontraron por similitud de significado (util cuando la pregunta esta en español y el documento en ingles, por ejemplo), no porque compartan las palabras exactas -- tratalos igual de validos, solo pueden requerir un poco mas de interpretacion. Si un dato puntual (un valor exacto, un procedimiento, una cifra) no aparece en los fragmentos incluidos, di que no esta capturado en lo que tienes disponible y que hay que abrir el documento original (menciona cual, por titulo) para confirmarlo -- no asumas que 'no existe' en el documento, solo que no esta en el fragmento que se te dio.",
     "Si la informacion disponible no alcanza para responder con certeza, dilo explicitamente en vez de adivinar.",
     "Responde en español, de forma clara y tecnica, apta para un ingeniero.",
-    "Al final de tu respuesta agrega siempre una seccion literal 'Fuentes utilizadas:' con una lista de los documentos (titulo, y codigo si lo tiene) y/o preguntas cerradas que usaste para responder. Si no usaste ninguna fuente puntual porque la respuesta es general, escribe 'Fuentes utilizadas: ninguna en particular'.",
+    "Al final de tu respuesta agrega siempre una seccion literal 'Fuentes utilizadas:' con una lista de los documentos (titulo, y codigo si lo tiene), preguntas cerradas y/o hallazgos/aprendizajes que usaste para responder. Si no usaste ninguna fuente puntual porque la respuesta es general, escribe 'Fuentes utilizadas: ninguna en particular'.",
     "",
     "=== CATALOGO COMPLETO DE REFERENCIAS DE PRODUCTO ===",
     formatearCatalogoCompleto(contexto.productos),
@@ -404,6 +473,9 @@ function construirBloqueEstatico(marcaNombre: string, contexto: Contexto): strin
     "",
     "=== PREGUNTAS DE SOPORTE CERRADAS (titulos; el detalle de las relevantes va mas abajo) ===",
     formatearPreguntasIndice(contexto.preguntasCerradas),
+    "",
+    "=== HALLAZGOS / APRENDIZAJES CONFIRMADOS ===",
+    formatearAprendizajes(contexto.aprendizajes),
   ].join("\n");
 }
 
@@ -445,7 +517,7 @@ export async function preguntarChatbot(pregunta: string, marcaNombre: string, co
     );
   }
 
-  const filtrado = filtrarContexto(pregunta, contexto);
+  const filtrado = await filtrarContexto(pregunta, contexto);
   const bloqueEstatico = construirBloqueEstatico(marcaNombre, contexto);
   const bloqueDinamico = construirBloqueDinamico(pregunta, filtrado);
 

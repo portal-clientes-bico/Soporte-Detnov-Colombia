@@ -58,6 +58,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       confianza: "CONFIRMADO",
       notas: parsed.data.notas ?? `Adjuntado desde la pregunta: ${pregunta.titulo}`,
       textoExtraidoEn: null,
+      embeddingsGeneradasEn: null,
       createdAt: now,
       updatedAt: now,
     });
@@ -71,12 +72,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return nuevoDocId;
   });
 
-  // Extraccion de texto para el ChatBot: intento aparte, nunca hace fallar la subida.
-  const extraidoEn = await extraerYGuardarSiCorresponde({ id: documentoId, confianza: "CONFIRMADO", archivoPath: guardado.archivoPath });
-  if (extraidoEn) {
+  // Extraccion de texto + embeddings para el ChatBot: intento aparte, nunca hace fallar la subida.
+  const resultado = await extraerYGuardarSiCorresponde({ id: documentoId, confianza: "CONFIRMADO", archivoPath: guardado.archivoPath });
+  if (resultado.textoExtraidoEn) {
     await mutarDb((db) => {
       const doc = db.documentos.find((d) => d.id === documentoId);
-      if (doc) doc.textoExtraidoEn = extraidoEn;
+      if (doc) {
+        doc.textoExtraidoEn = resultado.textoExtraidoEn;
+        doc.embeddingsGeneradasEn = resultado.embeddingsGeneradasEn;
+      }
     });
   }
 
