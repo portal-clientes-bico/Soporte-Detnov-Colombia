@@ -18,7 +18,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     if (datos.referencia && datos.referencia !== producto.referencia) {
       if (db.productos.some((p) => p.marcaId === producto.marcaId && p.referencia === datos.referencia && p.id !== id)) {
-        return { status: 409 as const, error: `La referencia ${datos.referencia} ya existe en esta marca` };
+        return { status: 409 as const, error: `El producto ${datos.referencia} ya existe en esta marca` };
       }
     }
 

@@ -46,12 +46,12 @@ export default function ProductoEditor({ producto, slug }: { producto: Producto;
   }
 
   async function handleDelete() {
-    if (!confirm(`¿Borrar la referencia ${producto.referencia}? Se perderan sus vinculos y hallazgos asociados.`)) return;
+    if (!confirm(`¿Borrar el producto ${producto.referencia}? Se perderan sus vinculos y hallazgos asociados.`)) return;
     setLoading(true);
     const res = await fetch(`/api/productos/${producto.id}`, { method: "DELETE" });
     setLoading(false);
     if (!res.ok) {
-      setError("No se pudo borrar la referencia");
+      setError("No se pudo borrar el producto");
       return;
     }
     router.push(`/${slug}/productos`);
@@ -104,7 +104,7 @@ export default function ProductoEditor({ producto, slug }: { producto: Producto;
     <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label className="block text-sm text-zinc-600 dark:text-zinc-400">Referencia</label>
+          <label className="block text-sm text-zinc-600 dark:text-zinc-400">Producto</label>
           <input value={referencia} onChange={(e) => setReferencia(e.target.value)} required className={inputClass} />
         </div>
         <div>
@@ -137,11 +137,11 @@ export default function ProductoEditor({ producto, slug }: { producto: Producto;
         </div>
         <div>
           <label className="block text-sm text-zinc-600 dark:text-zinc-400">Sustituye a</label>
-          <input value={sustituyeA} onChange={(e) => setSustituyeA(e.target.value)} placeholder="referencia" className={inputClass} />
+          <input value={sustituyeA} onChange={(e) => setSustituyeA(e.target.value)} placeholder="producto" className={inputClass} />
         </div>
         <div>
           <label className="block text-sm text-zinc-600 dark:text-zinc-400">Sustituida por</label>
-          <input value={sustituidaPor} onChange={(e) => setSustituidaPor(e.target.value)} placeholder="referencia" className={inputClass} />
+          <input value={sustituidaPor} onChange={(e) => setSustituidaPor(e.target.value)} placeholder="producto" className={inputClass} />
         </div>
       </div>
       <div>

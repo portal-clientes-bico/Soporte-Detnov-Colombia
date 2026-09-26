@@ -46,7 +46,7 @@ function HallazgoCampos({
           </select>
         </div>
         <div>
-          <label className="block text-sm text-zinc-600 dark:text-zinc-400">Referencia relacionada (opcional)</label>
+          <label className="block text-sm text-zinc-600 dark:text-zinc-400">Producto relacionado (opcional)</label>
           <select value={valores.productoId} onChange={(e) => onChange("productoId", e.target.value)} className={inputClass}>
             <option value="">Ninguna</option>
             {referencias.map((r) => (

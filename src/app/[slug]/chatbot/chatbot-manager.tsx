@@ -57,7 +57,7 @@ export default function ChatbotManager({ slug, usoInicial }: { slug: string; uso
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-zinc-600 dark:text-zinc-400">
-        Pregunta en lenguaje natural sobre esta marca. El ChatBot responde solo con base en las referencias registradas, los documentos con confianza{" "}
+        Pregunta en lenguaje natural sobre esta marca. El ChatBot responde solo con base en los productos registrados, los documentos con confianza{" "}
         <span className="font-medium">confirmado</span> y las preguntas de soporte ya cerradas — y cita al final que uso.
       </p>
 

@@ -74,7 +74,7 @@ export default async function PreguntasPage({
         )}
         {sp.referencia && (
           <span className="text-sm text-zinc-500 dark:text-zinc-400">
-            Filtrando por referencia: <span className="font-medium">{sp.referencia}</span>
+            Filtrando por producto: <span className="font-medium">{sp.referencia}</span>
           </span>
         )}
       </form>

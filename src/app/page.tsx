@@ -10,7 +10,7 @@ export default async function HomePage() {
       <div>
         <h1 className="text-2xl font-semibold">Marcas</h1>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Base de conocimiento por marca: referencias, documentos (con fuente, version, fecha e idioma),
+          Base de conocimiento por marca: productos, documentos (con fuente, version, fecha e idioma),
           fuentes de informacion y hallazgos de investigacion.
         </p>
       </div>
@@ -38,7 +38,7 @@ export default async function HomePage() {
               </div>
               {m.descripcion && <p className="line-clamp-2 text-xs text-zinc-500 dark:text-zinc-400">{m.descripcion}</p>}
               <div className="mt-1 flex gap-4 text-xs text-zinc-500 dark:text-zinc-400">
-                <span>{m.productos} referencias</span>
+                <span>{m.productos} productos</span>
                 <span>{m.documentos} documentos</span>
                 <span>{m.fuentes} fuentes</span>
               </div>

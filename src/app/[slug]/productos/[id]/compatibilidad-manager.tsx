@@ -89,7 +89,7 @@ export default function CompatibilidadManager({
       {referenciasDisponibles.length > 0 ? (
         <form onSubmit={handleAdd} className="flex flex-wrap items-end gap-2">
           <div>
-            <label className="block text-xs text-zinc-500 dark:text-zinc-400">Referencia compatible</label>
+            <label className="block text-xs text-zinc-500 dark:text-zinc-400">Producto compatible</label>
             <select
               value={compatibleId}
               onChange={(e) => setCompatibleId(e.target.value)}
@@ -117,7 +117,7 @@ export default function CompatibilidadManager({
           {error && <p className="w-full text-sm text-red-600 dark:text-red-400">{error}</p>}
         </form>
       ) : (
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">No hay mas referencias disponibles para vincular. Crea una nueva referencia si hace falta.</p>
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">No hay mas productos disponibles para vincular. Crea un nuevo producto si hace falta.</p>
       )}
     </div>
   );

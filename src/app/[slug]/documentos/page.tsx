@@ -34,7 +34,7 @@ export default async function DocumentosPage({
           <input
             name="q"
             defaultValue={sp.q}
-            placeholder="Titulo, codigo, referencia..."
+            placeholder="Titulo, codigo, producto..."
             className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
           />
         </div>

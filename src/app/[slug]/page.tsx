@@ -36,7 +36,7 @@ export default async function MarcaResumenPage({ params }: { params: Promise<{ s
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
         <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
           <p className="text-2xl font-semibold">{totalProductos}</p>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">Referencias</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">Productos</p>
         </div>
         <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
           <p className="text-2xl font-semibold">{resumen.generaciones.length}</p>
@@ -56,7 +56,7 @@ export default async function MarcaResumenPage({ params }: { params: Promise<{ s
         <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
           <p className="mb-2 font-medium">Por familia</p>
           {resumen.porFamilia.length === 0 ? (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">Sin referencias registradas.</p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">Sin productos registrados.</p>
           ) : (
             <ul className="flex flex-col gap-1 text-sm">
               {resumen.porFamilia
@@ -76,7 +76,7 @@ export default async function MarcaResumenPage({ params }: { params: Promise<{ s
         <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
           <p className="mb-2 font-medium">Por estado</p>
           {resumen.porEstado.length === 0 ? (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">Sin referencias registradas.</p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">Sin productos registrados.</p>
           ) : (
             <ul className="flex flex-col gap-1 text-sm">
               {resumen.porEstado

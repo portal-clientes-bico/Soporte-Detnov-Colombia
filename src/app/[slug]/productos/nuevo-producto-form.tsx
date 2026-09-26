@@ -25,7 +25,7 @@ export default function NuevoProductoForm({ marcaId, slug }: { marcaId: string; 
         onClick={() => setOpen(true)}
         className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300"
       >
-        + Nueva referencia
+        + Nuevo producto
       </button>
     );
   }
@@ -42,7 +42,7 @@ export default function NuevoProductoForm({ marcaId, slug }: { marcaId: string; 
     const data = await res.json().catch(() => ({}));
     setLoading(false);
     if (!res.ok) {
-      setError(data.error ?? "No se pudo crear la referencia");
+      setError(data.error ?? "No se pudo crear el producto");
       return;
     }
     router.push(`/${slug}/productos/${data.id}`);
@@ -51,11 +51,11 @@ export default function NuevoProductoForm({ marcaId, slug }: { marcaId: string; 
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-      <p className="font-medium">Nueva referencia</p>
+      <p className="font-medium">Nuevo producto</p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label htmlFor="referencia" className="block text-sm text-zinc-600 dark:text-zinc-400">
-            Referencia (numero de parte)
+            Producto (numero de parte)
           </label>
           <input id="referencia" value={referencia} onChange={(e) => setReferencia(e.target.value)} required className={inputClass} />
         </div>
@@ -103,7 +103,7 @@ export default function NuevoProductoForm({ marcaId, slug }: { marcaId: string; 
           disabled={loading}
           className="self-start rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-60 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300"
         >
-          {loading ? "Creando..." : "Crear referencia"}
+          {loading ? "Creando..." : "Crear producto"}
         </button>
         <button type="button" onClick={() => setOpen(false)} className="self-start text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-50">
           Cancelar

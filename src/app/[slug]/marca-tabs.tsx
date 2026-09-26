@@ -9,7 +9,7 @@ export default function MarcaTabs({ slug }: { slug: string }) {
 
   const tabs = [
     { href: `${base}/preguntas`, label: "Preguntas" },
-    { href: `${base}/productos`, label: "Referencias" },
+    { href: `${base}/productos`, label: "Productos" },
     { href: `${base}/documentos`, label: "Documentos" },
     { href: `${base}/fuentes`, label: "Fuentes" },
     { href: `${base}/hallazgos`, label: "Hallazgos" },

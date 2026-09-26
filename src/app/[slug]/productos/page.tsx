@@ -4,6 +4,17 @@ import { FAMILIA_PRODUCTO_VALUES, PRODUCTO_ESTADOS, PRODUCTO_ESTADO_VALUES, labe
 import type { SoporteProductoEstado } from "@/lib/db";
 import NuevoProductoForm from "./nuevo-producto-form";
 
+/** El glifo unicode "▶" se renderiza en algunos navegadores/fuentes con su propio color de
+ * emoji, ignorando el CSS "color". Un SVG con fill="currentColor" si respeta el color de
+ * texto heredado (ver el mismo problema en preguntas-manager.tsx). */
+function Chevron() {
+  return (
+    <svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor" aria-hidden="true">
+      <path d="M5 3l6 5-6 5V3z" />
+    </svg>
+  );
+}
+
 const estadoBadgeClass: Record<SoporteProductoEstado, string> = {
   ACTIVO: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
   NUEVO: "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300",
@@ -18,7 +29,7 @@ function TablaProductos({ slug, productos }: { slug: string; productos: Producto
     <table className="w-full text-sm">
       <thead className="bg-zinc-50 text-left text-xs uppercase text-zinc-500 dark:bg-zinc-900/60 dark:text-zinc-400">
         <tr>
-          <th className="px-3 py-2">Referencia</th>
+          <th className="px-3 py-2">Producto</th>
           <th className="px-3 py-2">Nombre</th>
           <th className="px-3 py-2">Estado</th>
           <th className="px-3 py-2">Lista de precios BICO</th>
@@ -99,7 +110,7 @@ export default async function ProductosPage({
             id="q"
             name="q"
             defaultValue={q}
-            placeholder="Referencia, nombre..."
+            placeholder="Producto, nombre..."
             className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
           />
         </div>
@@ -172,11 +183,11 @@ export default async function ProductosPage({
       </form>
 
       <p className="text-sm text-zinc-500 dark:text-zinc-400">
-        {productos.length} referencia{productos.length === 1 ? "" : "s"}
+        {productos.length} producto{productos.length === 1 ? "" : "s"}
       </p>
 
       {productos.length === 0 ? (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">Ninguna referencia coincide con el filtro.</p>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">Ningún producto coincide con el filtro.</p>
       ) : (
         <div className="flex flex-col gap-3">
           {generacionesOrdenadas.map((gen) => {
@@ -187,7 +198,9 @@ export default async function ProductosPage({
               <details key={gen ?? "sin-clasificar"} open className="group rounded-xl border border-zinc-200 bg-zinc-50/50 dark:border-zinc-800 dark:bg-zinc-900/20">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-xl px-4 py-3 select-none marker:content-none">
                   <span className="flex items-center gap-2 text-base font-semibold">
-                    <span className="inline-block text-zinc-400 transition-transform group-open:rotate-90">▶</span>
+                    <span className="inline-block text-zinc-900 transition-transform group-open:rotate-90 dark:text-zinc-50">
+                      <Chevron />
+                    </span>
                     {labelGeneracion(gen)}
                   </span>
                   <span className="rounded-full bg-zinc-200 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">{totalGeneracion}</span>
@@ -199,7 +212,9 @@ export default async function ProductosPage({
                       <details key={fam} open className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
                         <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-3 py-2 select-none marker:content-none">
                           <span className="flex items-center gap-2 text-sm font-medium">
-                            <span className="inline-block text-zinc-400 transition-transform group-open:rotate-90">▶</span>
+                            <span className="inline-block text-zinc-900 transition-transform group-open:rotate-90 dark:text-zinc-50">
+                              <Chevron />
+                            </span>
                             {labelFamilia(fam)}
                           </span>
                           <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">{items.length}</span>

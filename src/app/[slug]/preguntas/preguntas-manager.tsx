@@ -19,6 +19,29 @@ const prioridadBadge: Record<string, string> = {
   BAJA: "bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200",
 };
 
+/** Color de fondo/borde de la ficha de la pregunta segun su prioridad -- mismo color que
+ * prioridadBadge, pero como tinte suave de tarjeta en vez de una insignia. */
+const prioridadCardClass: Record<string, string> = {
+  ALTA: "border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-950/20",
+  MEDIA: "border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20",
+  BAJA: "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900",
+};
+
+/** Color "negro" para los chevrons desplegables: negro sobre fondo claro, blanco sobre
+ * fondo oscuro (el mismo patron que el texto principal de la app). */
+const CHEVRON_CLASS = "inline-block shrink-0 text-zinc-900 transition-transform group-open:rotate-90 dark:text-zinc-50";
+
+/** El glifo unicode "▶" se renderiza en algunos navegadores/fuentes con su propio color de
+ * emoji, ignorando el CSS "color" -- por eso se veia azul aunque CHEVRON_CLASS pida negro. Un
+ * SVG con fill="currentColor" si respeta el color de texto heredado. */
+function Chevron() {
+  return (
+    <svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor" aria-hidden="true">
+      <path d="M5 3l6 5-6 5V3z" />
+    </svg>
+  );
+}
+
 const organizacionBadge: Record<string, string> = {
   DISTRIBUIDOR: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300",
   DETNOV: "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300",
@@ -37,24 +60,29 @@ function SelectorReferencias({
 }) {
   const [busqueda, setBusqueda] = useState("");
   const q = busqueda.trim().toLowerCase();
-  const filtradas = q ? referencias.filter((r) => r.referencia.toLowerCase().includes(q) || r.nombre.toLowerCase().includes(q)) : referencias;
+  const filtradas = q
+    ? referencias.filter((r) => r.referencia.toLowerCase().includes(q) || r.nombre.toLowerCase().includes(q) || (r.descripcion ?? "").toLowerCase().includes(q))
+    : referencias;
 
   return (
     <div className="flex flex-col gap-1.5">
       <input
         value={busqueda}
         onChange={(e) => setBusqueda(e.target.value)}
-        placeholder="Buscar referencia..."
+        placeholder="Buscar producto..."
         className={inputClass}
       />
-      <div className="grid max-h-40 grid-cols-2 gap-1 overflow-y-auto rounded-lg border border-zinc-200 p-2 sm:grid-cols-3 dark:border-zinc-800">
+      <div className="grid max-h-48 grid-cols-1 gap-1 overflow-y-auto rounded-lg border border-zinc-200 p-2 sm:grid-cols-2 dark:border-zinc-800">
         {filtradas.length === 0 ? (
           <p className="col-span-full text-xs text-zinc-500 dark:text-zinc-400">Sin coincidencias.</p>
         ) : (
           filtradas.map((r) => (
-            <label key={r.id} className="flex items-center gap-1.5 text-xs text-zinc-700 dark:text-zinc-300">
-              <input type="checkbox" checked={seleccionadas.includes(r.id)} onChange={() => onToggle(r.id)} />
-              {r.referencia}
+            <label key={r.id} className="flex items-start gap-1.5 text-xs text-zinc-700 dark:text-zinc-300" title={r.descripcion ?? undefined}>
+              <input type="checkbox" checked={seleccionadas.includes(r.id)} onChange={() => onToggle(r.id)} className="mt-0.5 shrink-0" />
+              <span>
+                <span className="font-medium">{r.referencia}</span>
+                {r.descripcion && <span className="block truncate text-zinc-500 dark:text-zinc-400">{r.descripcion}</span>}
+              </span>
             </label>
           ))
         )}
@@ -67,12 +95,14 @@ function VincularReferenciaBuscador({ referenciasDisponibles, onVincular, loadin
   const [open, setOpen] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const q = busqueda.trim().toLowerCase();
-  const filtradas = q ? referenciasDisponibles.filter((r) => r.referencia.toLowerCase().includes(q) || r.nombre.toLowerCase().includes(q)) : referenciasDisponibles;
+  const filtradas = q
+    ? referenciasDisponibles.filter((r) => r.referencia.toLowerCase().includes(q) || r.nombre.toLowerCase().includes(q) || (r.descripcion ?? "").toLowerCase().includes(q))
+    : referenciasDisponibles;
 
   if (!open) {
     return (
       <button type="button" onClick={() => setOpen(true)} className="rounded-full border border-dashed border-zinc-300 px-2 py-0.5 text-xs text-zinc-500 hover:border-zinc-500 hover:text-zinc-900 dark:border-zinc-700 dark:hover:text-zinc-50">
-        + vincular referencia
+        + vincular producto
       </button>
     );
   }
@@ -84,7 +114,7 @@ function VincularReferenciaBuscador({ referenciasDisponibles, onVincular, loadin
           autoFocus
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar referencia..."
+          placeholder="Buscar producto..."
           className="w-40 rounded-lg border border-zinc-300 px-2 py-1 text-xs text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
         />
         <button
@@ -98,7 +128,7 @@ function VincularReferenciaBuscador({ referenciasDisponibles, onVincular, loadin
           Cerrar
         </button>
       </div>
-      <div className="flex max-h-32 flex-wrap gap-1 overflow-y-auto">
+      <div className="flex max-h-40 flex-col gap-1 overflow-y-auto">
         {filtradas.length === 0 ? (
           <p className="text-xs text-zinc-500 dark:text-zinc-400">Sin coincidencias.</p>
         ) : (
@@ -111,9 +141,11 @@ function VincularReferenciaBuscador({ referenciasDisponibles, onVincular, loadin
                 onVincular(r.id);
                 setBusqueda("");
               }}
-              className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-700 hover:bg-zinc-200 disabled:opacity-60 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+              title={r.descripcion ?? undefined}
+              className="flex flex-col items-start rounded-lg bg-zinc-100 px-2 py-1 text-left text-xs text-zinc-700 hover:bg-zinc-200 disabled:opacity-60 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
             >
-              {r.referencia}
+              <span className="font-medium">{r.referencia}</span>
+              {r.descripcion && <span className="w-full truncate text-zinc-500 dark:text-zinc-400">{r.descripcion}</span>}
             </button>
           ))
         )}
@@ -233,7 +265,7 @@ function NuevaPreguntaForm({ marcaId, referencias, usuarios }: { marcaId: string
       <CamposPregunta valores={valores} onChange={(c, v) => setValores((prev) => ({ ...prev, [c]: v }))} usuarios={usuarios} />
       {referencias.length > 0 && (
         <div>
-          <p className="mb-1 text-sm text-zinc-600 dark:text-zinc-400">Referencias relacionadas</p>
+          <p className="mb-1 text-sm text-zinc-600 dark:text-zinc-400">Productos relacionados</p>
           <SelectorReferencias
             referencias={referencias}
             seleccionadas={productos}
@@ -549,10 +581,10 @@ function PreguntaCard({ pregunta, referencias, usuarios }: { pregunta: Pregunta;
 
   return (
     <details
-      className={`group rounded-xl border ${pregunta.estado === "CERRADA" ? "border-zinc-100 bg-zinc-50 opacity-80 dark:border-zinc-800/60 dark:bg-zinc-900/40" : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"}`}
+      className={`group rounded-xl border ${prioridadCardClass[pregunta.prioridad]} ${pregunta.estado === "CERRADA" ? "opacity-70" : ""}`}
     >
       <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 select-none marker:content-none">
-        <span className="inline-block shrink-0 text-zinc-400 transition-transform group-open:rotate-90">▶</span>
+        <span className={CHEVRON_CLASS}><Chevron /></span>
         <p className="font-medium">{pregunta.titulo}</p>
       </summary>
 
@@ -671,7 +703,7 @@ export default function PreguntasManager({
               <details key={org ?? "sin-organizacion"} open className="group rounded-xl border border-zinc-200 bg-zinc-50/50 dark:border-zinc-800 dark:bg-zinc-900/20">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-xl px-4 py-3 select-none marker:content-none">
                   <span className="flex items-center gap-2 text-base font-semibold">
-                    <span className="inline-block text-zinc-400 transition-transform group-open:rotate-90">▶</span>
+                    <span className={CHEVRON_CLASS}><Chevron /></span>
                     {labelOrganizacion(org)}
                   </span>
                   <span className="rounded-full bg-zinc-200 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">{totalOrganizacion}</span>
@@ -683,7 +715,7 @@ export default function PreguntasManager({
                       <details key={asignado ?? "sin-asignar"} open className="group rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
                         <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-3 py-2 select-none marker:content-none">
                           <span className="flex items-center gap-2 text-sm font-medium">
-                            <span className="inline-block text-zinc-400 transition-transform group-open:rotate-90">▶</span>
+                            <span className={CHEVRON_CLASS}><Chevron /></span>
                             {asignado ?? "Sin asignar"}
                           </span>
                           <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">{items.length}</span>

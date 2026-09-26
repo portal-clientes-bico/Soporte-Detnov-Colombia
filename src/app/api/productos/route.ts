@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     if (!marca) return { status: 404 as const, error: "Marca no encontrada" };
 
     if (db.productos.some((p) => p.marcaId === marcaId && p.referencia === datos.referencia)) {
-      return { status: 409 as const, error: `La referencia ${datos.referencia} ya existe en esta marca` };
+      return { status: 409 as const, error: `El producto ${datos.referencia} ya existe en esta marca` };
     }
 
     const now = ahora();

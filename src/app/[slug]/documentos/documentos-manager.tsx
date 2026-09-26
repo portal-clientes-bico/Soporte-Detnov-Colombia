@@ -12,6 +12,17 @@ type Referencia = Awaited<ReturnType<typeof getReferenciasDeMarca>>[number];
 const inputClass =
   "w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50";
 
+/** El glifo unicode "▶" se renderiza en algunos navegadores/fuentes con su propio color de
+ * emoji, ignorando el CSS "color". Un SVG con fill="currentColor" si respeta el color de
+ * texto heredado (ver el mismo problema en preguntas-manager.tsx). */
+function Chevron() {
+  return (
+    <svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor" aria-hidden="true">
+      <path d="M5 3l6 5-6 5V3z" />
+    </svg>
+  );
+}
+
 const confianzaBadge: Record<string, string> = {
   CONFIRMADO: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
   PROBABLE: "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300",
@@ -165,7 +176,7 @@ function NuevoDocumentoForm({ marcaId, fuentes, referencias }: { marcaId: string
       </div>
       {referencias.length > 0 && (
         <div>
-          <p className="mb-1 text-sm text-zinc-600 dark:text-zinc-400">Referencias que documenta</p>
+          <p className="mb-1 text-sm text-zinc-600 dark:text-zinc-400">Productos que documenta</p>
           <div className="grid max-h-40 grid-cols-2 gap-1 overflow-y-auto rounded-lg border border-zinc-200 p-2 sm:grid-cols-3 dark:border-zinc-800">
             {referencias.map((r) => (
               <label key={r.id} className="flex items-center gap-1.5 text-xs text-zinc-700 dark:text-zinc-300">
@@ -341,7 +352,7 @@ function DocumentoCard({ documento, fuentes, referencias }: { documento: Documen
         {referenciasDisponibles.length > 0 && (
           <span className="flex items-center gap-1">
             <select value={nuevaReferenciaId} onChange={(e) => setNuevaReferenciaId(e.target.value)} className="rounded-full border border-zinc-300 px-2 py-0.5 text-xs text-zinc-700 outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-              <option value="">+ vincular referencia</option>
+              <option value="">+ vincular producto</option>
               {referenciasDisponibles.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.referencia}
@@ -378,7 +389,9 @@ function GrupoDocumentos({
     <details open={abiertoPorDefecto} className="group rounded-xl border border-zinc-200 bg-zinc-50/50 dark:border-zinc-800 dark:bg-zinc-900/20">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-xl px-4 py-3 select-none marker:content-none">
         <span className="flex items-center gap-2 font-medium">
-          <span className="inline-block text-zinc-400 transition-transform group-open:rotate-90">▶</span>
+          <span className="inline-block text-zinc-900 transition-transform group-open:rotate-90 dark:text-zinc-50">
+            <Chevron />
+          </span>
           {titulo}
         </span>
         <span className="rounded-full bg-zinc-200 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">{documentos.length}</span>

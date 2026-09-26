@@ -295,7 +295,7 @@ export async function getReferenciasDeMarca(marcaId: string) {
   const db = await leerDb();
   return db.productos
     .filter((p) => p.marcaId === marcaId)
-    .map((p) => ({ id: p.id, referencia: p.referencia, nombre: p.nombre, familia: p.familia }))
+    .map((p) => ({ id: p.id, referencia: p.referencia, nombre: p.nombre, familia: p.familia, descripcion: p.descripcion }))
     .sort((a, b) => a.referencia.localeCompare(b.referencia));
 }
 

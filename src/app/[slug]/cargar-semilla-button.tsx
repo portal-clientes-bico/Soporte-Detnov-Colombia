@@ -23,7 +23,7 @@ export default function CargarSemillaButton({ slug }: { slug: string }) {
       return;
     }
     setMensaje(
-      `Cargados: ${data.fuentes} fuentes, ${data.productos} referencias, ${data.compatibilidades} compatibilidades, ${data.documentos} documentos, ${data.hallazgos} hallazgos.`,
+      `Cargados: ${data.fuentes} fuentes, ${data.productos} productos, ${data.compatibilidades} compatibilidades, ${data.documentos} documentos, ${data.hallazgos} hallazgos.`,
     );
     setAdvertencias(data.advertencias ?? []);
     router.refresh();
