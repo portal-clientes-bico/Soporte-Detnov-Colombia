@@ -707,6 +707,27 @@ function PreguntaCard({ pregunta, referencias, usuarios, documentos }: { pregunt
     return (
       <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
         <CamposPregunta valores={valores} onChange={(c, v) => setValores((prev) => ({ ...prev, [c]: v }))} usuarios={usuarios} />
+
+        <div>
+          <p className="mb-1 text-sm text-zinc-600 dark:text-zinc-400">Productos relacionados</p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {pregunta.productos.map((r) => (
+              <span key={r.id} className="flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                {r.referencia}
+                <button type="button" onClick={() => handleDesvincular(r.id)} disabled={loading} className="text-zinc-400 hover:text-red-600 dark:hover:text-red-400">
+                  ×
+                </button>
+              </span>
+            ))}
+            {referenciasDisponibles.length > 0 && <VincularReferenciaBuscador referenciasDisponibles={referenciasDisponibles} onVincular={handleVincular} loading={loading} />}
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-1 text-sm text-zinc-600 dark:text-zinc-400">Documentos relacionados</p>
+          <ArchivosPanel pregunta={pregunta} documentosDisponibles={documentosDisponibles} />
+        </div>
+
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         <div className="flex gap-3">
           <button type="button" onClick={handleSave} disabled={loading} className="self-start rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-60 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300">
