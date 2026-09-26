@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { getMarcaPorSlug, getPreguntasDeMarca, getReferenciasDeMarca } from "@/lib/queries";
-import { PREGUNTA_ASIGNADOS, PREGUNTA_ASIGNADO_VALUES, PREGUNTA_ESTADO_VALUES, PREGUNTA_ESTADOS, PREGUNTA_PRIORIDAD_VALUES, PREGUNTA_PRIORIDADES } from "@/lib/tipos";
-import type { SoportePreguntaAsignado, SoportePreguntaEstado, SoportePreguntaPrioridad } from "@/lib/db";
+import { getMarcaPorSlug, getPreguntasDeMarca, getReferenciasDeMarca, getUsuarios } from "@/lib/queries";
+import { PREGUNTA_ESTADO_VALUES, PREGUNTA_ESTADOS, PREGUNTA_PRIORIDAD_VALUES, PREGUNTA_PRIORIDADES } from "@/lib/tipos";
+import type { SoportePreguntaEstado, SoportePreguntaPrioridad } from "@/lib/db";
 import PreguntasManager from "./preguntas-manager";
 
 export default async function PreguntasPage({
@@ -9,7 +9,7 @@ export default async function PreguntasPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ prioridad?: string; estado?: string; asignadoA?: string; referencia?: string }>;
+  searchParams: Promise<{ prioridad?: string; estado?: string; asignadoAUsuarioId?: string; referencia?: string }>;
 }) {
   const { slug } = await params;
   const sp = await searchParams;
@@ -18,11 +18,12 @@ export default async function PreguntasPage({
 
   const prioridadFiltro = sp.prioridad && PREGUNTA_PRIORIDAD_VALUES.includes(sp.prioridad as SoportePreguntaPrioridad) ? (sp.prioridad as SoportePreguntaPrioridad) : undefined;
   const estadoFiltro = sp.estado && PREGUNTA_ESTADO_VALUES.includes(sp.estado as SoportePreguntaEstado) ? (sp.estado as SoportePreguntaEstado) : undefined;
-  const asignadoFiltro = sp.asignadoA && PREGUNTA_ASIGNADO_VALUES.includes(sp.asignadoA as SoportePreguntaAsignado) ? (sp.asignadoA as SoportePreguntaAsignado) : undefined;
+  const asignadoFiltro = sp.asignadoAUsuarioId || undefined;
 
-  const [preguntas, referencias] = await Promise.all([
-    getPreguntasDeMarca(marca.id, { prioridad: prioridadFiltro, estado: estadoFiltro, asignadoA: asignadoFiltro }),
+  const [preguntas, referencias, usuarios] = await Promise.all([
+    getPreguntasDeMarca(marca.id, { prioridad: prioridadFiltro, estado: estadoFiltro, asignadoAUsuarioId: asignadoFiltro }),
     getReferenciasDeMarca(marca.id),
+    getUsuarios(),
   ]);
 
   const preguntasFiltradas = sp.referencia ? preguntas.filter((p) => p.productos.some((r) => r.referencia === sp.referencia)) : preguntas;
@@ -53,12 +54,12 @@ export default async function PreguntasPage({
           </select>
         </div>
         <div>
-          <label className="block text-xs text-zinc-500 dark:text-zinc-400">Asignada a</label>
-          <select name="asignadoA" defaultValue={asignadoFiltro ?? ""} className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50">
-            <option value="">Todas</option>
-            {PREGUNTA_ASIGNADO_VALUES.map((a) => (
-              <option key={a} value={a}>
-                {PREGUNTA_ASIGNADOS[a]}
+          <label className="block text-xs text-zinc-500 dark:text-zinc-400">Asignado a</label>
+          <select name="asignadoAUsuarioId" defaultValue={asignadoFiltro ?? ""} className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50">
+            <option value="">Todos</option>
+            {usuarios.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.nombre}
               </option>
             ))}
           </select>
@@ -78,7 +79,7 @@ export default async function PreguntasPage({
         )}
       </form>
 
-      <PreguntasManager marcaId={marca.id} preguntas={preguntasFiltradas} referencias={referencias} slug={slug} />
+      <PreguntasManager marcaId={marca.id} preguntas={preguntasFiltradas} referencias={referencias} usuarios={usuarios} slug={slug} />
     </div>
   );
 }

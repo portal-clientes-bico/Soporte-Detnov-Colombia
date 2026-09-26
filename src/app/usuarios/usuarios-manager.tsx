@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { getUsuarios } from "@/lib/queries";
+import { ORGANIZACIONES, ORGANIZACION_VALUES } from "@/lib/tipos";
 import { guardarUsuarioActual, leerUsuarioActual } from "@/lib/usuario-actual";
 
 type Usuario = Awaited<ReturnType<typeof getUsuarios>>[number];
@@ -11,10 +12,16 @@ const inputClass =
   "w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50";
 
 function valoresIniciales() {
-  return { nombre: "", email: "", password: "" };
+  return { nombre: "", email: "", password: "", organizacion: "" };
 }
 
-function UsuarioCampos({ valores, onChange }: { valores: { nombre: string; email: string }; onChange: (campo: string, valor: string) => void }) {
+function UsuarioCampos({
+  valores,
+  onChange,
+}: {
+  valores: { nombre: string; email: string; organizacion: string };
+  onChange: (campo: string, valor: string) => void;
+}) {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <div>
@@ -24,6 +31,17 @@ function UsuarioCampos({ valores, onChange }: { valores: { nombre: string; email
       <div>
         <label className="block text-sm text-zinc-600 dark:text-zinc-400">Email</label>
         <input type="email" value={valores.email} onChange={(e) => onChange("email", e.target.value)} className={inputClass} />
+      </div>
+      <div>
+        <label className="block text-sm text-zinc-600 dark:text-zinc-400">Organización</label>
+        <select value={valores.organizacion} onChange={(e) => onChange("organizacion", e.target.value)} className={inputClass}>
+          <option value="">Sin asignar</option>
+          {ORGANIZACION_VALUES.map((o) => (
+            <option key={o} value={o}>
+              {ORGANIZACIONES[o]}
+            </option>
+          ))}
+        </select>
       </div>
     </div>
   );
@@ -87,6 +105,17 @@ function NuevoUsuarioForm() {
             minLength={4}
             className={inputClass}
           />
+        </div>
+        <div>
+          <label className="block text-sm text-zinc-600 dark:text-zinc-400">Organización</label>
+          <select value={valores.organizacion} onChange={(e) => setValores((p) => ({ ...p, organizacion: e.target.value }))} className={inputClass}>
+            <option value="">Sin asignar</option>
+            {ORGANIZACION_VALUES.map((o) => (
+              <option key={o} value={o}>
+                {ORGANIZACIONES[o]}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
@@ -179,7 +208,7 @@ function PasswordPanel({ usuarioId, tienePassword }: { usuarioId: string; tieneP
 function UsuarioCard({ usuario }: { usuario: Usuario }) {
   const router = useRouter();
   const [editando, setEditando] = useState(false);
-  const [valores, setValores] = useState({ nombre: usuario.nombre, email: usuario.email ?? "" });
+  const [valores, setValores] = useState({ nombre: usuario.nombre, email: usuario.email ?? "", organizacion: usuario.organizacion ?? "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [esActual, setEsActual] = useState(false);
@@ -242,6 +271,9 @@ function UsuarioCard({ usuario }: { usuario: Usuario }) {
         <div className="flex items-center gap-2">
           <p className="font-medium">{usuario.nombre}</p>
           {esActual && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">Tu</span>}
+          {usuario.organizacion && (
+            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">{ORGANIZACIONES[usuario.organizacion]}</span>
+          )}
         </div>
         {usuario.email && <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{usuario.email}</p>}
         <PasswordPanel usuarioId={usuario.id} tienePassword={usuario.tienePassword} />

@@ -14,7 +14,6 @@ import type {
   SoporteHallazgoEstado,
   SoporteHallazgoTipo,
   SoporteIdioma,
-  SoportePreguntaAsignado,
   SoportePreguntaEstado,
   SoportePreguntaPrioridad,
   SoporteProductoEstado,
@@ -255,7 +254,7 @@ export async function getHallazgosDeMarca(marcaId: string, filtro: FiltroHallazg
 export interface FiltroPreguntas {
   prioridad?: SoportePreguntaPrioridad;
   estado?: SoportePreguntaEstado;
-  asignadoA?: SoportePreguntaAsignado;
+  asignadoAUsuarioId?: string;
 }
 
 const ORDEN_PRIORIDAD: Record<string, number> = { ALTA: 0, MEDIA: 1, BAJA: 2 };
@@ -265,10 +264,9 @@ export async function getPreguntasDeMarca(marcaId: string, filtro: FiltroPregunt
   const db = await leerDb();
   return db.preguntas
     .filter((p) => p.marcaId === marcaId)
-    .map((p) => ({ ...p, asignadoA: p.asignadoA ?? "SIN_ASIGNAR" }))
     .filter((p) => !filtro.prioridad || p.prioridad === filtro.prioridad)
     .filter((p) => !filtro.estado || p.estado === filtro.estado)
-    .filter((p) => !filtro.asignadoA || p.asignadoA === filtro.asignadoA)
+    .filter((p) => !filtro.asignadoAUsuarioId || p.asignadoAUsuarioId === filtro.asignadoAUsuarioId)
     .map((p) => {
       const productos = db.preguntaProductos
         .filter((pp) => pp.preguntaId === p.id)
@@ -280,7 +278,10 @@ export async function getPreguntasDeMarca(marcaId: string, filtro: FiltroPregunt
         .map((pd) => db.documentos.find((x) => x.id === pd.documentoId))
         .filter((x): x is Documento => !!x)
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-      return { ...p, productos, archivos };
+      // La Organizacion ya no se guarda en la pregunta: se consulta a partir del usuario
+      // asignado (ver Usuario.organizacion en db.ts).
+      const asignado = p.asignadoAUsuarioId ? (db.usuarios.find((u) => u.id === p.asignadoAUsuarioId) ?? null) : null;
+      return { ...p, productos, archivos, asignadoNombre: asignado?.nombre ?? null, organizacion: asignado?.organizacion ?? null };
     })
     .sort(
       (a, b) =>

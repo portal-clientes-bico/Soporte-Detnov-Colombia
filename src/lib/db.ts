@@ -60,7 +60,10 @@ export type SoporteHallazgoTipo = "REGLA" | "DISCREPANCIA" | "PENDIENTE" | "HALL
 export type SoporteHallazgoEstado = "ABIERTO" | "RESUELTO";
 export type SoportePreguntaPrioridad = "ALTA" | "MEDIA" | "BAJA";
 export type SoportePreguntaEstado = "ABIERTA" | "CERRADA";
-export type SoportePreguntaAsignado = "SIN_ASIGNAR" | "DISTRIBUIDOR" | "DETNOV" | "MAPLE_ARMOR";
+/** Organizacion a la que pertenece un usuario. La "Organizacion" de una pregunta ya no se
+ * elige a mano: se consulta a partir del usuario asignado (ver Pregunta.asignadoAUsuarioId
+ * y getPreguntasDeMarca en queries.ts). */
+export type SoporteOrganizacion = "DISTRIBUIDOR" | "MAPLE_ARMOR" | "DETNOV";
 
 export interface Especificacion {
   grupo: string;
@@ -160,7 +163,9 @@ export interface Pregunta {
   id: string;
   marcaId: string;
   prioridad: SoportePreguntaPrioridad;
-  asignadoA: SoportePreguntaAsignado;
+  /** Usuario a cargo de la pregunta (id de Usuario). La "Organizacion" que se muestra en la
+   * UI ya no se guarda aqui: se consulta desde este usuario (ver getPreguntasDeMarca). */
+  asignadoAUsuarioId: string | null;
   titulo: string;
   contenido: string;
   autor: string;
@@ -188,6 +193,7 @@ export interface Usuario {
   email: string | null;
   /** "salt:hash" (scrypt). Nunca se envia al cliente; ver queries.ts (getUsuarios lo omite). */
   passwordHash: string | null;
+  organizacion: SoporteOrganizacion | null;
   createdAt: string;
   updatedAt: string;
 }

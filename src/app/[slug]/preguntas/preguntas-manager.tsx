@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { getPreguntasDeMarca, getReferenciasDeMarca } from "@/lib/queries";
-import { ARCHIVO_MAX_BYTES, DOCUMENTO_TIPO_VALUES, DOCUMENTO_TIPOS, PREGUNTA_ASIGNADOS, PREGUNTA_ASIGNADO_VALUES, PREGUNTA_PRIORIDADES, PREGUNTA_PRIORIDAD_VALUES } from "@/lib/tipos";
+import type { getPreguntasDeMarca, getReferenciasDeMarca, getUsuarios } from "@/lib/queries";
+import { ARCHIVO_MAX_BYTES, DOCUMENTO_TIPO_VALUES, DOCUMENTO_TIPOS, ORGANIZACIONES, PREGUNTA_PRIORIDADES, PREGUNTA_PRIORIDAD_VALUES } from "@/lib/tipos";
 import { nombreUsuarioActual } from "@/lib/usuario-actual";
 
 type Pregunta = Awaited<ReturnType<typeof getPreguntasDeMarca>>[number];
 type Referencia = Awaited<ReturnType<typeof getReferenciasDeMarca>>[number];
+type Usuario = Awaited<ReturnType<typeof getUsuarios>>[number];
 
 const inputClass =
   "w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50";
@@ -18,12 +19,12 @@ const prioridadBadge: Record<string, string> = {
   BAJA: "bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200",
 };
 
-const asignadoBadge: Record<string, string> = {
-  SIN_ASIGNAR: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400",
+const organizacionBadge: Record<string, string> = {
   DISTRIBUIDOR: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300",
   DETNOV: "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300",
   MAPLE_ARMOR: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300",
 };
+const SIN_ASIGNAR_BADGE = "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400";
 
 function SelectorReferencias({
   referencias,
@@ -131,15 +132,17 @@ function formatFechaHora(iso: string | null): string {
 }
 
 function valoresIniciales() {
-  return { prioridad: "MEDIA", asignadoA: "SIN_ASIGNAR", titulo: "", contenido: "", autor: "" };
+  return { prioridad: "MEDIA", asignadoAUsuarioId: "", titulo: "", contenido: "", autor: "" };
 }
 
 function CamposPregunta({
   valores,
   onChange,
+  usuarios,
 }: {
-  valores: { prioridad: string; asignadoA: string; titulo: string; contenido: string; autor: string };
+  valores: { prioridad: string; asignadoAUsuarioId: string; titulo: string; contenido: string; autor: string };
   onChange: (campo: string, valor: string) => void;
+  usuarios: Usuario[];
 }) {
   return (
     <div className="flex flex-col gap-3">
@@ -155,11 +158,12 @@ function CamposPregunta({
           </select>
         </div>
         <div>
-          <label className="block text-sm text-zinc-600 dark:text-zinc-400">Asignada a</label>
-          <select value={valores.asignadoA} onChange={(e) => onChange("asignadoA", e.target.value)} className={inputClass}>
-            {PREGUNTA_ASIGNADO_VALUES.map((a) => (
-              <option key={a} value={a}>
-                {PREGUNTA_ASIGNADOS[a]}
+          <label className="block text-sm text-zinc-600 dark:text-zinc-400">Asignado a</label>
+          <select value={valores.asignadoAUsuarioId} onChange={(e) => onChange("asignadoAUsuarioId", e.target.value)} className={inputClass}>
+            <option value="">Sin asignar</option>
+            {usuarios.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.nombre}
               </option>
             ))}
           </select>
@@ -181,7 +185,7 @@ function CamposPregunta({
   );
 }
 
-function NuevaPreguntaForm({ marcaId, referencias }: { marcaId: string; referencias: Referencia[] }) {
+function NuevaPreguntaForm({ marcaId, referencias, usuarios }: { marcaId: string; referencias: Referencia[]; usuarios: Usuario[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [valores, setValores] = useState(valoresIniciales());
@@ -226,7 +230,7 @@ function NuevaPreguntaForm({ marcaId, referencias }: { marcaId: string; referenc
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
       <p className="font-medium">Nueva pregunta</p>
-      <CamposPregunta valores={valores} onChange={(c, v) => setValores((prev) => ({ ...prev, [c]: v }))} />
+      <CamposPregunta valores={valores} onChange={(c, v) => setValores((prev) => ({ ...prev, [c]: v }))} usuarios={usuarios} />
       {referencias.length > 0 && (
         <div>
           <p className="mb-1 text-sm text-zinc-600 dark:text-zinc-400">Referencias relacionadas</p>
@@ -451,10 +455,16 @@ function ArchivosPanel({ pregunta }: { pregunta: Pregunta }) {
   );
 }
 
-function PreguntaCard({ pregunta, referencias }: { pregunta: Pregunta; referencias: Referencia[] }) {
+function PreguntaCard({ pregunta, referencias, usuarios }: { pregunta: Pregunta; referencias: Referencia[]; usuarios: Usuario[] }) {
   const router = useRouter();
   const [editando, setEditando] = useState(false);
-  const [valores, setValores] = useState({ prioridad: pregunta.prioridad, asignadoA: pregunta.asignadoA, titulo: pregunta.titulo, contenido: pregunta.contenido, autor: pregunta.autor });
+  const [valores, setValores] = useState({
+    prioridad: pregunta.prioridad,
+    asignadoAUsuarioId: pregunta.asignadoAUsuarioId ?? "",
+    titulo: pregunta.titulo,
+    contenido: pregunta.contenido,
+    autor: pregunta.autor,
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -523,7 +533,7 @@ function PreguntaCard({ pregunta, referencias }: { pregunta: Pregunta; referenci
   if (editando) {
     return (
       <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-        <CamposPregunta valores={valores} onChange={(c, v) => setValores((prev) => ({ ...prev, [c]: v }))} />
+        <CamposPregunta valores={valores} onChange={(c, v) => setValores((prev) => ({ ...prev, [c]: v }))} usuarios={usuarios} />
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         <div className="flex gap-3">
           <button type="button" onClick={handleSave} disabled={loading} className="self-start rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-60 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300">
@@ -546,12 +556,18 @@ function PreguntaCard({ pregunta, referencias }: { pregunta: Pregunta; referenci
             <span className={`rounded-full px-2 py-0.5 text-xs ${pregunta.estado === "ABIERTA" ? "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300" : "bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300"}`}>
               {pregunta.estado === "ABIERTA" ? "Abierta" : "Cerrada"}
             </span>
-            <span className={`rounded-full px-2 py-0.5 text-xs ${asignadoBadge[pregunta.asignadoA]}`}>{PREGUNTA_ASIGNADOS[pregunta.asignadoA]}</span>
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs ${pregunta.organizacion ? organizacionBadge[pregunta.organizacion] : SIN_ASIGNAR_BADGE}`}
+              title="Se consulta a partir del usuario asignado (campo 'Asignado a')"
+            >
+              {pregunta.organizacion ? ORGANIZACIONES[pregunta.organizacion] : "Sin organizacion"}
+            </span>
             <p className="font-medium">{pregunta.titulo}</p>
           </div>
           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
             Preguntó {pregunta.autor} · {formatFechaHora(pregunta.createdAt)}
             {pregunta.fechaCierre ? ` · Cerrada ${formatFechaHora(pregunta.fechaCierre)}` : ""}
+            {pregunta.asignadoNombre ? ` · Asignado a ${pregunta.asignadoNombre}` : ""}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-3 text-xs">
@@ -590,15 +606,26 @@ function PreguntaCard({ pregunta, referencias }: { pregunta: Pregunta; referenci
   );
 }
 
-export default function PreguntasManager({ marcaId, preguntas, referencias }: { marcaId: string; preguntas: Pregunta[]; referencias: Referencia[]; slug: string }) {
+export default function PreguntasManager({
+  marcaId,
+  preguntas,
+  referencias,
+  usuarios,
+}: {
+  marcaId: string;
+  preguntas: Pregunta[];
+  referencias: Referencia[];
+  usuarios: Usuario[];
+  slug: string;
+}) {
   return (
     <div className="flex flex-col gap-4">
       {preguntas.length === 0 ? (
         <p className="text-sm text-zinc-500 dark:text-zinc-400">Ninguna pregunta coincide con el filtro.</p>
       ) : (
-        preguntas.map((p) => <PreguntaCard key={p.id} pregunta={p} referencias={referencias} />)
+        preguntas.map((p) => <PreguntaCard key={p.id} pregunta={p} referencias={referencias} usuarios={usuarios} />)
       )}
-      <NuevaPreguntaForm marcaId={marcaId} referencias={referencias} />
+      <NuevaPreguntaForm marcaId={marcaId} referencias={referencias} usuarios={usuarios} />
     </div>
   );
 }

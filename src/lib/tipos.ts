@@ -5,7 +5,7 @@ import type {
   SoporteHallazgoEstado,
   SoporteHallazgoTipo,
   SoporteIdioma,
-  SoportePreguntaAsignado,
+  SoporteOrganizacion,
   SoportePreguntaEstado,
   SoportePreguntaPrioridad,
   SoporteProductoEstado,
@@ -249,14 +249,13 @@ export const PREGUNTA_ESTADOS: Record<SoportePreguntaEstado, string> = {
 
 export const PREGUNTA_ESTADO_VALUES = Object.keys(PREGUNTA_ESTADOS) as SoportePreguntaEstado[];
 
-export const PREGUNTA_ASIGNADOS: Record<SoportePreguntaAsignado, string> = {
-  SIN_ASIGNAR: "Sin asignar",
+export const ORGANIZACIONES: Record<SoporteOrganizacion, string> = {
   DISTRIBUIDOR: "Distribuidor",
-  DETNOV: "Detnov",
   MAPLE_ARMOR: "Maple Armor",
+  DETNOV: "Detnov",
 };
 
-export const PREGUNTA_ASIGNADO_VALUES = Object.keys(PREGUNTA_ASIGNADOS) as SoportePreguntaAsignado[];
+export const ORGANIZACION_VALUES = Object.keys(ORGANIZACIONES) as SoporteOrganizacion[];
 
 /** Tipos de archivo aceptados al subir un documento. */
 export const ARCHIVO_TIPOS_PERMITIDOS: Record<string, string> = {

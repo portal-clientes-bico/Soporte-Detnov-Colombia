@@ -25,6 +25,7 @@ export async function POST(request: Request) {
       nombre: parsed.data.nombre,
       email: parsed.data.email,
       passwordHash: hashPassword(parsed.data.password),
+      organizacion: parsed.data.organizacion,
       createdAt: now,
       updatedAt: now,
     };

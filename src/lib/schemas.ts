@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { SoporteOrganizacion } from "@/lib/db";
 import {
   CONFIANZA_VALUES,
   DOCUMENTO_TIPO_VALUES,
@@ -7,7 +8,7 @@ import {
   HALLAZGO_ESTADO_VALUES,
   HALLAZGO_TIPO_VALUES,
   IDIOMA_VALUES,
-  PREGUNTA_ASIGNADO_VALUES,
+  ORGANIZACION_VALUES,
   PREGUNTA_ESTADO_VALUES,
   PREGUNTA_PRIORIDAD_VALUES,
   PRODUCTO_ESTADO_VALUES,
@@ -36,6 +37,13 @@ const emailOpcional = z
   .optional()
   .transform((v) => (v ? v : null))
   .refine((v) => v === null || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), "Email invalido");
+
+const organizacionOpcional = z
+  .string()
+  .trim()
+  .optional()
+  .transform((v) => (v ? v : null))
+  .refine((v): v is SoporteOrganizacion | null => v === null || (ORGANIZACION_VALUES as string[]).includes(v), "Organizacion invalida");
 
 export const marcaSchema = z.object({
   nombre: z.string().trim().min(2).max(100),
@@ -111,7 +119,9 @@ export const hallazgoPatchSchema = hallazgoSchema.omit({ marcaId: true }).partia
  */
 export const preguntaCamposSchema = z.object({
   prioridad: z.enum(PREGUNTA_PRIORIDAD_VALUES),
-  asignadoA: z.enum(PREGUNTA_ASIGNADO_VALUES),
+  /** Usuario a cargo de la pregunta; la Organizacion se consulta a partir de este usuario
+   * (ver getPreguntasDeMarca), ya no se guarda en la pregunta. */
+  asignadoAUsuarioId: textoOpcional(60),
   titulo: z.string().trim().min(3).max(250),
   contenido: z.string().trim().min(3).max(10000),
   autor: z.string().trim().min(1).max(120),
@@ -137,6 +147,7 @@ export const preguntaArchivoCamposSchema = z.object({
 export const usuarioSchema = z.object({
   nombre: z.string().trim().min(1).max(120),
   email: emailOpcional,
+  organizacion: organizacionOpcional,
 });
 
 export const usuarioPatchSchema = usuarioSchema.partial();
@@ -153,6 +164,7 @@ export const usuarioConPasswordSchema = z.object({
   nombre: z.string().trim().min(1).max(120),
   email: emailRequerido,
   password: z.string().min(4).max(200),
+  organizacion: organizacionOpcional,
 });
 
 /** Establecer o cambiar la contrasena de un usuario existente (accion separada del PATCH normal). */
