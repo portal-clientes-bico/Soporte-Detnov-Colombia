@@ -19,12 +19,13 @@ const prioridadBadge: Record<string, string> = {
   BAJA: "bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200",
 };
 
-/** Color de fondo/borde de la ficha de la pregunta segun su prioridad -- mismo color que
- * prioridadBadge, pero como tinte suave de tarjeta en vez de una insignia. */
+/** Color de fondo/borde de la ficha de la pregunta segun su prioridad -- tonos muy tenues
+ * (rojo/naranja/amarillo) para que se note la prioridad de un vistazo sin que el color grite
+ * mas que el contenido. */
 const prioridadCardClass: Record<string, string> = {
-  ALTA: "border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-950/20",
-  MEDIA: "border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20",
-  BAJA: "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900",
+  ALTA: "border-red-100 bg-red-50/60 dark:border-red-900/30 dark:bg-red-950/10",
+  MEDIA: "border-orange-100 bg-orange-50/60 dark:border-orange-900/30 dark:bg-orange-950/10",
+  BAJA: "border-yellow-100 bg-yellow-50/60 dark:border-yellow-900/30 dark:bg-yellow-950/10",
 };
 
 /** Color "negro" para los chevrons desplegables: negro sobre fondo claro, blanco sobre
