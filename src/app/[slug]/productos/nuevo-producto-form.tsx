@@ -45,7 +45,7 @@ export default function NuevoProductoForm({ marcaId, slug }: { marcaId: string; 
       setError(data.error ?? "No se pudo crear el producto");
       return;
     }
-    router.push(`/${slug}/productos/${data.id}`);
+    router.push(`/${slug}/productos/${encodeURIComponent(data.id)}`);
     router.refresh();
   }
 

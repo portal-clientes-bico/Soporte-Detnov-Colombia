@@ -40,7 +40,7 @@ export default function CompatibilidadManager({
     if (!compatibleId) return;
     setLoading(true);
     setError(null);
-    const res = await fetch(`/api/productos/${productoId}/compatibilidad`, {
+    const res = await fetch(`/api/productos/${encodeURIComponent(productoId)}/compatibilidad`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ compatibleId, nota }),
@@ -58,7 +58,7 @@ export default function CompatibilidadManager({
 
   async function handleRemove(compatibilidadId: string) {
     setLoading(true);
-    await fetch(`/api/productos/${productoId}/compatibilidad/${compatibilidadId}`, { method: "DELETE" });
+    await fetch(`/api/productos/${encodeURIComponent(productoId)}/compatibilidad/${encodeURIComponent(compatibilidadId)}`, { method: "DELETE" });
     setLoading(false);
     router.refresh();
   }

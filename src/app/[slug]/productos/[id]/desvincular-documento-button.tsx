@@ -9,7 +9,7 @@ export default function DesvincularDocumentoButton({ documentoId, productoId }: 
 
   async function handleClick() {
     setLoading(true);
-    await fetch(`/api/documentos/${documentoId}/productos/${productoId}`, { method: "DELETE" });
+    await fetch(`/api/documentos/${encodeURIComponent(documentoId)}/productos/${encodeURIComponent(productoId)}`, { method: "DELETE" });
     setLoading(false);
     router.refresh();
   }

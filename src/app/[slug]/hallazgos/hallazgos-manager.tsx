@@ -131,7 +131,7 @@ function HallazgoCard({ hallazgo, referencias, slug }: { hallazgo: Hallazgo; ref
   async function handleSave() {
     setLoading(true);
     setError(null);
-    const res = await fetch(`/api/hallazgos/${hallazgo.id}`, {
+    const res = await fetch(`/api/hallazgos/${encodeURIComponent(hallazgo.id)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(valores),
@@ -149,7 +149,7 @@ function HallazgoCard({ hallazgo, referencias, slug }: { hallazgo: Hallazgo; ref
   async function toggleEstado() {
     setLoading(true);
     const nuevoEstado = hallazgo.estado === "ABIERTO" ? "RESUELTO" : "ABIERTO";
-    await fetch(`/api/hallazgos/${hallazgo.id}`, {
+    await fetch(`/api/hallazgos/${encodeURIComponent(hallazgo.id)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ estado: nuevoEstado }),
@@ -161,7 +161,7 @@ function HallazgoCard({ hallazgo, referencias, slug }: { hallazgo: Hallazgo; ref
   async function handleDelete() {
     if (!confirm(`¿Borrar el hallazgo "${hallazgo.titulo}"?`)) return;
     setLoading(true);
-    const res = await fetch(`/api/hallazgos/${hallazgo.id}`, { method: "DELETE" });
+    const res = await fetch(`/api/hallazgos/${encodeURIComponent(hallazgo.id)}`, { method: "DELETE" });
     setLoading(false);
     if (!res.ok) {
       setError("No se pudo borrar el hallazgo");
@@ -194,7 +194,7 @@ function HallazgoCard({ hallazgo, referencias, slug }: { hallazgo: Hallazgo; ref
           <span className={`rounded-full px-2 py-0.5 text-xs ${tipoBadge[hallazgo.tipo]}`}>{HALLAZGO_TIPOS[hallazgo.tipo].label}</span>
           <p className="font-medium">{hallazgo.titulo}</p>
           {hallazgo.producto && (
-            <Link href={`/${slug}/productos/${hallazgo.producto.id}`} className="text-xs text-zinc-500 underline hover:text-zinc-900 dark:hover:text-zinc-50">
+            <Link href={`/${slug}/productos/${encodeURIComponent(hallazgo.producto.id)}`} className="text-xs text-zinc-500 underline hover:text-zinc-900 dark:hover:text-zinc-50">
               {hallazgo.producto.referencia}
             </Link>
           )}

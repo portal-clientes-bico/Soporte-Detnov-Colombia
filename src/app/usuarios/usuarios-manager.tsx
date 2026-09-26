@@ -143,7 +143,7 @@ function PasswordPanel({ usuarioId, tienePassword }: { usuarioId: string; tieneP
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const res = await fetch(`/api/usuarios/${usuarioId}/password`, {
+    const res = await fetch(`/api/usuarios/${encodeURIComponent(usuarioId)}/password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ password }),
@@ -220,7 +220,7 @@ function UsuarioCard({ usuario }: { usuario: Usuario }) {
   async function handleSave() {
     setLoading(true);
     setError(null);
-    const res = await fetch(`/api/usuarios/${usuario.id}`, {
+    const res = await fetch(`/api/usuarios/${encodeURIComponent(usuario.id)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(valores),
@@ -239,7 +239,7 @@ function UsuarioCard({ usuario }: { usuario: Usuario }) {
   async function handleDelete() {
     if (!confirm(`¿Borrar el usuario "${usuario.nombre}"?`)) return;
     setLoading(true);
-    const res = await fetch(`/api/usuarios/${usuario.id}`, { method: "DELETE" });
+    const res = await fetch(`/api/usuarios/${encodeURIComponent(usuario.id)}`, { method: "DELETE" });
     setLoading(false);
     if (!res.ok) {
       setError("No se pudo borrar el usuario");

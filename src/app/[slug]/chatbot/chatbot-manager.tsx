@@ -34,7 +34,7 @@ export default function ChatbotManager({ slug, usoInicial }: { slug: string; uso
     const indice = turnos.length;
     setTurnos((prev) => [...prev, { pregunta: texto, respuesta: null, error: null, loading: true }]);
 
-    const res = await fetch(`/api/marcas/${slug}/chatbot`, {
+    const res = await fetch(`/api/marcas/${encodeURIComponent(slug)}/chatbot`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pregunta: texto }),

@@ -225,7 +225,7 @@ function DocumentoCard({ documento, fuentes, referencias }: { documento: Documen
   async function handleSave() {
     setLoading(true);
     setError(null);
-    const res = await fetch(`/api/documentos/${documento.id}`, {
+    const res = await fetch(`/api/documentos/${encodeURIComponent(documento.id)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(valores),
@@ -243,7 +243,7 @@ function DocumentoCard({ documento, fuentes, referencias }: { documento: Documen
   async function handleDelete() {
     if (!confirm(`¿Borrar el documento "${documento.titulo}"?`)) return;
     setLoading(true);
-    const res = await fetch(`/api/documentos/${documento.id}`, { method: "DELETE" });
+    const res = await fetch(`/api/documentos/${encodeURIComponent(documento.id)}`, { method: "DELETE" });
     setLoading(false);
     if (!res.ok) {
       setError("No se pudo borrar el documento");
@@ -255,7 +255,7 @@ function DocumentoCard({ documento, fuentes, referencias }: { documento: Documen
   async function handleVincular() {
     if (!nuevaReferenciaId) return;
     setLoading(true);
-    await fetch(`/api/documentos/${documento.id}/productos`, {
+    await fetch(`/api/documentos/${encodeURIComponent(documento.id)}/productos`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ productoId: nuevaReferenciaId }),
@@ -267,7 +267,7 @@ function DocumentoCard({ documento, fuentes, referencias }: { documento: Documen
 
   async function handleDesvincular(productoId: string) {
     setLoading(true);
-    await fetch(`/api/documentos/${documento.id}/productos/${productoId}`, { method: "DELETE" });
+    await fetch(`/api/documentos/${encodeURIComponent(documento.id)}/productos/${encodeURIComponent(productoId)}`, { method: "DELETE" });
     setLoading(false);
     router.refresh();
   }

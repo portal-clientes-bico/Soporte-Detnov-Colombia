@@ -109,7 +109,7 @@ function FuenteCard({ fuente }: { fuente: Fuente }) {
   async function handleSave() {
     setLoading(true);
     setError(null);
-    const res = await fetch(`/api/fuentes/${fuente.id}`, {
+    const res = await fetch(`/api/fuentes/${encodeURIComponent(fuente.id)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(valores),
@@ -127,7 +127,7 @@ function FuenteCard({ fuente }: { fuente: Fuente }) {
   async function handleDelete() {
     if (!confirm(`¿Borrar la fuente "${fuente.nombre}"? Los documentos que la usan quedaran sin fuente.`)) return;
     setLoading(true);
-    const res = await fetch(`/api/fuentes/${fuente.id}`, { method: "DELETE" });
+    const res = await fetch(`/api/fuentes/${encodeURIComponent(fuente.id)}`, { method: "DELETE" });
     setLoading(false);
     if (!res.ok) {
       setError("No se pudo borrar la fuente");

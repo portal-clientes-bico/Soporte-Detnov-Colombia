@@ -435,7 +435,7 @@ function RespuestaPanel({ pregunta }: { pregunta: Pregunta }) {
     }
     setLoading(true);
     setError(null);
-    const res = await fetch(`/api/preguntas/${pregunta.id}`, {
+    const res = await fetch(`/api/preguntas/${encodeURIComponent(pregunta.id)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ respondedor, respuesta }),
@@ -452,7 +452,7 @@ function RespuestaPanel({ pregunta }: { pregunta: Pregunta }) {
   async function declararResuelta() {
     setLoading(true);
     setError(null);
-    const res = await fetch(`/api/preguntas/${pregunta.id}`, {
+    const res = await fetch(`/api/preguntas/${encodeURIComponent(pregunta.id)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ estado: "CERRADA" }),
@@ -538,7 +538,7 @@ function ArchivosPanel({ pregunta, documentosDisponibles }: { pregunta: Pregunta
     formData.set("tipo", tipo);
     formData.set("titulo", titulo || archivo.name);
     formData.set("file", archivo);
-    const res = await fetch(`/api/preguntas/${pregunta.id}/archivos`, { method: "POST", body: formData });
+    const res = await fetch(`/api/preguntas/${encodeURIComponent(pregunta.id)}/archivos`, { method: "POST", body: formData });
     const data = await res.json().catch(() => ({}));
     setLoading(false);
     if (!res.ok) {
@@ -554,13 +554,13 @@ function ArchivosPanel({ pregunta, documentosDisponibles }: { pregunta: Pregunta
   }
 
   async function handleDesvincular(documentoId: string) {
-    await fetch(`/api/preguntas/${pregunta.id}/archivos/${documentoId}`, { method: "DELETE" });
+    await fetch(`/api/preguntas/${encodeURIComponent(pregunta.id)}/archivos/${encodeURIComponent(documentoId)}`, { method: "DELETE" });
     router.refresh();
   }
 
   async function handleVincularExistente(documentoId: string) {
     setLoading(true);
-    await fetch(`/api/preguntas/${pregunta.id}/documentos`, {
+    await fetch(`/api/preguntas/${encodeURIComponent(pregunta.id)}/documentos`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ documentoId }),
@@ -646,7 +646,7 @@ function PreguntaCard({ pregunta, referencias, usuarios, documentos }: { pregunt
   async function handleSave() {
     setLoading(true);
     setError(null);
-    const res = await fetch(`/api/preguntas/${pregunta.id}`, {
+    const res = await fetch(`/api/preguntas/${encodeURIComponent(pregunta.id)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(valores),
@@ -664,7 +664,7 @@ function PreguntaCard({ pregunta, referencias, usuarios, documentos }: { pregunt
   async function toggleEstado() {
     setLoading(true);
     const nuevoEstado = pregunta.estado === "ABIERTA" ? "CERRADA" : "ABIERTA";
-    await fetch(`/api/preguntas/${pregunta.id}`, {
+    await fetch(`/api/preguntas/${encodeURIComponent(pregunta.id)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ estado: nuevoEstado }),
@@ -676,7 +676,7 @@ function PreguntaCard({ pregunta, referencias, usuarios, documentos }: { pregunt
   async function handleDelete() {
     if (!confirm(`¿Borrar la pregunta "${pregunta.titulo}"?`)) return;
     setLoading(true);
-    const res = await fetch(`/api/preguntas/${pregunta.id}`, { method: "DELETE" });
+    const res = await fetch(`/api/preguntas/${encodeURIComponent(pregunta.id)}`, { method: "DELETE" });
     setLoading(false);
     if (!res.ok) {
       setError("No se pudo borrar la pregunta");
@@ -687,7 +687,7 @@ function PreguntaCard({ pregunta, referencias, usuarios, documentos }: { pregunt
 
   async function handleVincular(productoId: string) {
     setLoading(true);
-    await fetch(`/api/preguntas/${pregunta.id}/productos`, {
+    await fetch(`/api/preguntas/${encodeURIComponent(pregunta.id)}/productos`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ productoId }),
@@ -698,7 +698,7 @@ function PreguntaCard({ pregunta, referencias, usuarios, documentos }: { pregunt
 
   async function handleDesvincular(productoId: string) {
     setLoading(true);
-    await fetch(`/api/preguntas/${pregunta.id}/productos/${productoId}`, { method: "DELETE" });
+    await fetch(`/api/preguntas/${encodeURIComponent(pregunta.id)}/productos/${encodeURIComponent(productoId)}`, { method: "DELETE" });
     setLoading(false);
     router.refresh();
   }

@@ -21,7 +21,7 @@ export default function DocumentoVinculoManager({ productoId, documentosDisponib
     if (!documentoId) return;
     setLoading(true);
     setError(null);
-    const res = await fetch(`/api/documentos/${documentoId}/productos`, {
+    const res = await fetch(`/api/documentos/${encodeURIComponent(documentoId)}/productos`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ productoId }),

@@ -42,7 +42,7 @@ function TablaProductos({ slug, productos }: { slug: string; productos: Producto
         {productos.map((p) => (
           <tr key={p.id} className="border-t border-zinc-100 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/50">
             <td className="px-3 py-2">
-              <Link href={`/${slug}/productos/${p.id}`} className="font-medium text-zinc-900 underline hover:text-zinc-600 dark:text-zinc-50 dark:hover:text-zinc-300">
+              <Link href={`/${slug}/productos/${encodeURIComponent(p.id)}`} className="font-medium text-zinc-900 underline hover:text-zinc-600 dark:text-zinc-50 dark:hover:text-zinc-300">
                 {p.referencia}
               </Link>
             </td>

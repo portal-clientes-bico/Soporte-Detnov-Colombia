@@ -15,7 +15,7 @@ export default function CargarSemillaButton({ slug }: { slug: string }) {
     setError(null);
     setMensaje(null);
     setAdvertencias([]);
-    const res = await fetch(`/api/marcas/${slug}/semilla`, { method: "POST" });
+    const res = await fetch(`/api/marcas/${encodeURIComponent(slug)}/semilla`, { method: "POST" });
     const data = await res.json().catch(() => ({}));
     setLoading(false);
     if (!res.ok) {

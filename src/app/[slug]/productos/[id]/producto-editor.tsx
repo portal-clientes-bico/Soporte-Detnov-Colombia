@@ -30,7 +30,7 @@ export default function ProductoEditor({ producto, slug }: { producto: Producto;
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const res = await fetch(`/api/productos/${producto.id}`, {
+    const res = await fetch(`/api/productos/${encodeURIComponent(producto.id)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ referencia, nombre, familia, generacion, estado, descripcion, notas, sustituyeA, sustituidaPor, especificacionesTexto }),
@@ -48,7 +48,7 @@ export default function ProductoEditor({ producto, slug }: { producto: Producto;
   async function handleDelete() {
     if (!confirm(`¿Borrar el producto ${producto.referencia}? Se perderan sus vinculos y hallazgos asociados.`)) return;
     setLoading(true);
-    const res = await fetch(`/api/productos/${producto.id}`, { method: "DELETE" });
+    const res = await fetch(`/api/productos/${encodeURIComponent(producto.id)}`, { method: "DELETE" });
     setLoading(false);
     if (!res.ok) {
       setError("No se pudo borrar el producto");
