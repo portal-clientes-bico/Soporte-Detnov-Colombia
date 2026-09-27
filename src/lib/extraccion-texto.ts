@@ -38,8 +38,7 @@ export function extensionSoportada(archivoPath: string): boolean {
   return EXTENSIONES_SOPORTADAS.has(path.extname(archivoPath).toLowerCase());
 }
 
-async function extraerPdf(rutaCompleta: string): Promise<PaginaExtraida[]> {
-  const buf = await fs.readFile(rutaCompleta);
+async function extraerPdf(buf: Buffer): Promise<PaginaExtraida[]> {
   const parser = new PDFParse({ data: buf });
   try {
     const resultado = await parser.getText();
@@ -49,11 +48,34 @@ async function extraerPdf(rutaCompleta: string): Promise<PaginaExtraida[]> {
   }
 }
 
+// Ver la nota equivalente en storage.ts sobre resolucion automatica de credenciales.
+const USAR_BLOB = !!process.env.BLOB_STORE_ID || !!process.env.BLOB_READ_WRITE_TOKEN;
+
+async function leerArchivoOriginal(archivoPath: string): Promise<Buffer> {
+  if (USAR_BLOB) {
+    const { head } = await import("@vercel/blob");
+    const info = await head(`uploads/${archivoPath}`);
+    const respuesta = await fetch(info.url);
+    return Buffer.from(await respuesta.arrayBuffer());
+  }
+  return fs.readFile(path.join(UPLOADS_DIR, archivoPath));
+}
+
 function rutaTextoDocumento(documentoId: string): string {
   return path.join(TEXTO_EXTRAIDO_DIR, `${documentoId}.json`);
 }
 
 export async function leerTextoDocumento(documentoId: string): Promise<TextoExtraidoDocumento | null> {
+  if (USAR_BLOB) {
+    try {
+      const { head } = await import("@vercel/blob");
+      const info = await head(`uploads-texto/${documentoId}.json`);
+      const respuesta = await fetch(info.url);
+      return (await respuesta.json()) as TextoExtraidoDocumento;
+    } catch {
+      return null;
+    }
+  }
   try {
     const raw = await fs.readFile(rutaTextoDocumento(documentoId), "utf8");
     return JSON.parse(raw) as TextoExtraidoDocumento;
@@ -63,12 +85,26 @@ export async function leerTextoDocumento(documentoId: string): Promise<TextoExtr
 }
 
 async function guardarTextoDocumento(documentoId: string, paginas: PaginaExtraida[]): Promise<void> {
-  await fs.mkdir(TEXTO_EXTRAIDO_DIR, { recursive: true });
   const contenido: TextoExtraidoDocumento = { documentoId, extraidoEn: ahora(), paginas };
+  if (USAR_BLOB) {
+    const { put } = await import("@vercel/blob");
+    await put(`uploads-texto/${documentoId}.json`, JSON.stringify(contenido), {
+      access: "public",
+      addRandomSuffix: false,
+      contentType: "application/json",
+    });
+    return;
+  }
+  await fs.mkdir(TEXTO_EXTRAIDO_DIR, { recursive: true });
   await fs.writeFile(rutaTextoDocumento(documentoId), JSON.stringify(contenido, null, 1), "utf8");
 }
 
 export async function borrarTextoDocumento(documentoId: string): Promise<void> {
+  if (USAR_BLOB) {
+    const { del } = await import("@vercel/blob");
+    await del(`uploads-texto/${documentoId}.json`).catch(() => {});
+    return;
+  }
   await fs.unlink(rutaTextoDocumento(documentoId)).catch(() => {});
 }
 
@@ -93,8 +129,8 @@ export async function extraerYGuardarSiCorresponde(documento: Pick<Documento, "i
 
   let paginas: PaginaExtraida[];
   try {
-    const rutaCompleta = path.join(UPLOADS_DIR, documento.archivoPath);
-    paginas = await extraerPdf(rutaCompleta);
+    const buf = await leerArchivoOriginal(documento.archivoPath);
+    paginas = await extraerPdf(buf);
     if (paginas.length === 0) return nada; // probablemente un PDF escaneado sin capa de texto
     await guardarTextoDocumento(documento.id, paginas);
   } catch (error) {

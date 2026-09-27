@@ -17,6 +17,9 @@ const CONTENT_TYPES: Record<string, string> = {
   ".txt": "text/plain",
 };
 
+// Ver la nota equivalente en storage.ts sobre resolucion automatica de credenciales.
+const USAR_BLOB = !!process.env.BLOB_STORE_ID || !!process.env.BLOB_READ_WRITE_TOKEN;
+
 export async function GET(_request: Request, { params }: { params: Promise<{ path: string[] }> }) {
   const { path: segments } = await params;
 
@@ -26,6 +29,21 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pat
     return NextResponse.json({ error: "Ruta invalida" }, { status: 400 });
   }
 
+  const ext = path.extname(safeSegments[safeSegments.length - 1] ?? "").toLowerCase();
+  const contentType = CONTENT_TYPES[ext] ?? "application/octet-stream";
+
+  if (USAR_BLOB) {
+    try {
+      const { head } = await import("@vercel/blob");
+      const info = await head(`uploads/${safeSegments.join("/")}`);
+      const respuesta = await fetch(info.url);
+      if (!respuesta.ok) throw new Error("blob fetch failed");
+      return new NextResponse(respuesta.body, { headers: { "Content-Type": contentType } });
+    } catch {
+      return NextResponse.json({ error: "Archivo no encontrado" }, { status: 404 });
+    }
+  }
+
   const filePath = path.join(UPLOADS_DIR, ...safeSegments);
   if (!filePath.startsWith(UPLOADS_DIR)) {
     return NextResponse.json({ error: "Ruta invalida" }, { status: 400 });
@@ -33,8 +51,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pat
 
   try {
     const buffer = await fs.readFile(filePath);
-    const ext = path.extname(filePath).toLowerCase();
-    const contentType = CONTENT_TYPES[ext] ?? "application/octet-stream";
     return new NextResponse(new Uint8Array(buffer), { headers: { "Content-Type": contentType } });
   } catch {
     return NextResponse.json({ error: "Archivo no encontrado" }, { status: 404 });

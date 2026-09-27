@@ -1,5 +1,6 @@
 import "server-only";
 import { promises as fs } from "fs";
+import os from "os";
 import path from "path";
 import { EMBEDDINGS_DIR, ahora } from "@/lib/db";
 
@@ -34,9 +35,14 @@ let extractorPromise: Promise<Extractor> | null = null;
  * siguientes llamadas reutilizan la misma instancia. */
 async function obtenerExtractor(): Promise<Extractor> {
   if (!extractorPromise) {
-    extractorPromise = import("@huggingface/transformers").then(({ pipeline }) =>
-      pipeline("feature-extraction", MODELO) as unknown as Promise<Extractor>,
-    );
+    extractorPromise = import("@huggingface/transformers").then(({ pipeline, env }) => {
+      // El default de la libreria cachea el modelo descargado junto al codigo del proyecto,
+      // una ruta de solo lectura en Vercel (y ademas efimera entre invocaciones). os.tmpdir()
+      // es la unica carpeta escribible ahi -- y sigue siendo la carpeta temporal normal en un
+      // computador local, asi que este cambio no afecta el uso local existente.
+      env.cacheDir = path.join(os.tmpdir(), "hf-cache");
+      return pipeline("feature-extraction", MODELO) as unknown as Promise<Extractor>;
+    });
   }
   return extractorPromise;
 }
@@ -75,11 +81,24 @@ export interface EmbeddingsDocumento {
   vectores: number[][];
 }
 
+// Ver la nota equivalente en storage.ts sobre resolucion automatica de credenciales.
+const USAR_BLOB = !!process.env.BLOB_STORE_ID || !!process.env.BLOB_READ_WRITE_TOKEN;
+
 function rutaEmbeddingsDocumento(documentoId: string): string {
   return path.join(EMBEDDINGS_DIR, `${documentoId}.json`);
 }
 
 export async function leerEmbeddingsDocumento(documentoId: string): Promise<EmbeddingsDocumento | null> {
+  if (USAR_BLOB) {
+    try {
+      const { head } = await import("@vercel/blob");
+      const info = await head(`uploads-embeddings/${documentoId}.json`);
+      const respuesta = await fetch(info.url);
+      return (await respuesta.json()) as EmbeddingsDocumento;
+    } catch {
+      return null;
+    }
+  }
   try {
     const raw = await fs.readFile(rutaEmbeddingsDocumento(documentoId), "utf8");
     return JSON.parse(raw) as EmbeddingsDocumento;
@@ -89,6 +108,11 @@ export async function leerEmbeddingsDocumento(documentoId: string): Promise<Embe
 }
 
 export async function borrarEmbeddingsDocumento(documentoId: string): Promise<void> {
+  if (USAR_BLOB) {
+    const { del } = await import("@vercel/blob");
+    await del(`uploads-embeddings/${documentoId}.json`).catch(() => {});
+    return;
+  }
   await fs.unlink(rutaEmbeddingsDocumento(documentoId)).catch(() => {});
 }
 
@@ -101,10 +125,19 @@ export async function generarYGuardarEmbeddings(documentoId: string, paginas: { 
   if (paginas.length === 0) return null;
   try {
     const vectores = await embederPaginas(paginas.map((p) => p.texto));
-    await fs.mkdir(EMBEDDINGS_DIR, { recursive: true });
     const generadoEn = ahora();
     const contenido: EmbeddingsDocumento = { documentoId, modelo: MODELO, generadoEn, vectores };
-    await fs.writeFile(rutaEmbeddingsDocumento(documentoId), JSON.stringify(contenido), "utf8");
+    if (USAR_BLOB) {
+      const { put } = await import("@vercel/blob");
+      await put(`uploads-embeddings/${documentoId}.json`, JSON.stringify(contenido), {
+        access: "public",
+        addRandomSuffix: false,
+        contentType: "application/json",
+      });
+    } else {
+      await fs.mkdir(EMBEDDINGS_DIR, { recursive: true });
+      await fs.writeFile(rutaEmbeddingsDocumento(documentoId), JSON.stringify(contenido), "utf8");
+    }
     return generadoEn;
   } catch (error) {
     console.error(`No se pudieron generar embeddings para el documento ${documentoId}:`, error);

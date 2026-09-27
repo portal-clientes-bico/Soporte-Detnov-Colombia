@@ -2,13 +2,16 @@ import "server-only";
 import { promises as fs } from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
+import { Pool } from "pg";
 
 /**
- * Base de datos local de la herramienta: un unico archivo JSON en disco
- * (data/db.json), sin servidor ni base de datos externa. Pensada para uso
- * personal en un solo computador: cada escritura relee y reescribe el
- * archivo completo, lo cual es mas que suficiente para el volumen de datos
- * de este proyecto (unos pocos miles de filas como mucho).
+ * Base de datos de la herramienta: un unico objeto JSON (el mismo `Db` de
+ * siempre) que segun el entorno vive en disco (data/db.json, uso local en un
+ * solo computador) o en una fila de Postgres (columna jsonb, despliegue en
+ * Vercel). El modo se elige solo con la presencia de POSTGRES_URL -- ningun
+ * otro archivo del proyecto (queries.ts, schemas.ts, las rutas de API) sabe
+ * ni le importa cual de los dos esta activo, porque ambos exponen la misma
+ * API (leerDb/escribirDb/mutarDb) sobre el mismo objeto Db en memoria.
  */
 
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -285,8 +288,33 @@ async function asegurarCarpetas(): Promise<void> {
   await fs.mkdir(EMBEDDINGS_DIR, { recursive: true });
 }
 
-/** Lee el archivo completo. Si no existe todavia, lo crea vacio. */
+const USAR_POSTGRES = !!process.env.POSTGRES_URL;
+
+let pool: Pool | null = null;
+function obtenerPool(): Pool {
+  if (!pool) pool = new Pool({ connectionString: process.env.POSTGRES_URL });
+  return pool;
+}
+
+async function asegurarTablaPostgres(): Promise<void> {
+  await obtenerPool().query(
+    `create table if not exists soporte_db (id smallint primary key, datos jsonb not null, actualizado_en timestamptz not null default now())`,
+  );
+}
+
+/** Lee la fila unica. Si no existe todavia, la crea vacia. */
 export async function leerDb(): Promise<Db> {
+  if (USAR_POSTGRES) {
+    await asegurarTablaPostgres();
+    const { rows } = await obtenerPool().query<{ datos: Partial<Db> }>("select datos from soporte_db where id = 1");
+    if (rows.length === 0) {
+      const vacia = dbVacia();
+      await escribirDb(vacia);
+      return vacia;
+    }
+    return normalizarDb(rows[0].datos);
+  }
+
   await asegurarCarpetas();
   try {
     const raw = await fs.readFile(DB_PATH, "utf8");
@@ -302,12 +330,24 @@ export async function leerDb(): Promise<Db> {
 }
 
 /**
- * Escribe el archivo completo. Simple mutex en memoria para evitar que dos
- * escrituras concurrentes se pisen (suficiente para un solo usuario local).
+ * Escribe la fila/archivo completo. En modo disco, un simple mutex en
+ * memoria evita que dos escrituras concurrentes se pisen (suficiente para un
+ * solo usuario local). En modo Postgres esto no aplica -- usar mutarDb, que
+ * toma un lock de fila real valido entre invocaciones serverless distintas.
  */
 let colaEscritura: Promise<void> = Promise.resolve();
 
 export async function escribirDb(db: Db): Promise<void> {
+  if (USAR_POSTGRES) {
+    await asegurarTablaPostgres();
+    await obtenerPool().query(
+      `insert into soporte_db (id, datos, actualizado_en) values (1, $1, now())
+       on conflict (id) do update set datos = $1, actualizado_en = now()`,
+      [JSON.stringify(db)],
+    );
+    return;
+  }
+
   await asegurarCarpetas();
   colaEscritura = colaEscritura.then(async () => {
     const tmp = DB_PATH + ".tmp";
@@ -317,8 +357,38 @@ export async function escribirDb(db: Db): Promise<void> {
   await colaEscritura;
 }
 
-/** Lee, aplica una mutacion y escribe. Devuelve lo que la mutacion retorne. */
+/**
+ * Lee, aplica una mutacion y escribe. Devuelve lo que la mutacion retorne.
+ * En modo Postgres, todo ocurre dentro de una transaccion con "select ... for
+ * update": el lock de fila bloquea a cualquier otra invocacion que tambien
+ * quiera mutar hasta que esta termine, evitando que dos escrituras
+ * concurrentes (llamadas serverless distintas, sin memoria compartida) se
+ * pisen -- el rol que jugaba colaEscritura en modo disco.
+ */
 export async function mutarDb<T>(fn: (db: Db) => T | Promise<T>): Promise<T> {
+  if (USAR_POSTGRES) {
+    await asegurarTablaPostgres();
+    const cliente = await obtenerPool().connect();
+    try {
+      await cliente.query("begin");
+      const { rows } = await cliente.query<{ datos: Partial<Db> }>("select datos from soporte_db where id = 1 for update");
+      const db = rows.length > 0 ? normalizarDb(rows[0].datos) : dbVacia();
+      const resultado = await fn(db);
+      await cliente.query(
+        `insert into soporte_db (id, datos, actualizado_en) values (1, $1, now())
+         on conflict (id) do update set datos = $1, actualizado_en = now()`,
+        [JSON.stringify(db)],
+      );
+      await cliente.query("commit");
+      return resultado;
+    } catch (error) {
+      await cliente.query("rollback").catch(() => {});
+      throw error;
+    } finally {
+      cliente.release();
+    }
+  }
+
   const db = await leerDb();
   const resultado = await fn(db);
   await escribirDb(db);
