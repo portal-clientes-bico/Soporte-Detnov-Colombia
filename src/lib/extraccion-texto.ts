@@ -1,23 +1,8 @@
 import "server-only";
 import { promises as fs } from "fs";
 import path from "path";
-import { PDFParse } from "pdf-parse";
-import * as pdfjsWorker from "pdfjs-dist/legacy/build/pdf.worker.mjs";
 import { TEXTO_EXTRAIDO_DIR, UPLOADS_DIR, ahora, type Documento } from "@/lib/db";
 import { generarYGuardarEmbeddings } from "@/lib/embeddings";
-
-/**
- * pdf-parse (via pdfjs-dist) intenta cargar su "worker" con un import() dinamico cuyo argumento
- * (GlobalWorkerOptions.workerSrc) solo se conoce en tiempo de ejecucion -- Turbopack no puede
- * seguirlo estaticamente y lo reescribe para resolver contra sus propios chunks del servidor,
- * ignorando el valor real. Falla con "Cannot find module .../pdf.worker.mjs" solo dentro del
- * server de Next (un script node comun, como scripts/extraer-texto-confirmados.js, no pasa por
- * Turbopack y no tiene este problema). La salida documentada por pdfjs-dist para bundlers es
- * importar el worker de forma estatica (Turbopack si la empaqueta bien) y publicarlo en
- * globalThis.pdfjsWorker: internamente, antes de intentar el import() dinamico, revisa si ya
- * existe globalThis.pdfjsWorker.WorkerMessageHandler y, si esta, lo usa directo sin import().
- */
-(globalThis as unknown as { pdfjsWorker: typeof pdfjsWorker }).pdfjsWorker = pdfjsWorker;
 
 export interface PaginaExtraida {
   numero: number;
@@ -39,6 +24,23 @@ export function extensionSoportada(archivoPath: string): boolean {
 }
 
 async function extraerPdf(buf: Buffer): Promise<PaginaExtraida[]> {
+  // pdf-parse (via pdfjs-dist) carga codigo pesado con efectos secundarios apenas se importa
+  // (intenta polyfillear DOMMatrix/ImageData/Path2D via el paquete opcional @napi-rs/canvas, no
+  // instalado) -- en Vercel eso revienta con "ReferenceError: DOMMatrix is not defined" para
+  // CUALQUIER ruta que solo con importar este archivo arrastrara la carga (este modulo lo
+  // importa queries.ts, usado por casi toda la app). Importar ambos paquetes de forma perezosa,
+  // solo aqui dentro, evita pagar ese costo (y ese riesgo) fuera del momento en que si hace
+  // falta extraer un PDF de verdad.
+  const [{ PDFParse }, pdfjsWorker] = await Promise.all([import("pdf-parse"), import("pdfjs-dist/legacy/build/pdf.worker.mjs")]);
+  // pdf-parse (via pdfjs-dist) intenta cargar su "worker" con un import() dinamico cuyo argumento
+  // (GlobalWorkerOptions.workerSrc) solo se conoce en tiempo de ejecucion -- Turbopack no puede
+  // seguirlo estaticamente y lo reescribe para resolver contra sus propios chunks del servidor,
+  // ignorando el valor real. La salida documentada por pdfjs-dist para bundlers es publicar el
+  // worker (importado aparte, con un literal que Turbopack si puede seguir) en
+  // globalThis.pdfjsWorker: internamente, antes de intentar el import() dinamico, revisa si ya
+  // existe globalThis.pdfjsWorker.WorkerMessageHandler y, si esta, lo usa directo sin import().
+  (globalThis as unknown as { pdfjsWorker: typeof pdfjsWorker }).pdfjsWorker = pdfjsWorker;
+
   const parser = new PDFParse({ data: buf });
   try {
     const resultado = await parser.getText();
