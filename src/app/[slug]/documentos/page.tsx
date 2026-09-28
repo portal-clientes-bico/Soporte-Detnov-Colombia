@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getDocumentosDeMarca, getFuentesDeMarca, getMarcaPorSlug, getReferenciasDeMarca } from "@/lib/queries";
+import { getDocumentosDeMarca, getFuentesDeMarca, getMarcaPorSlug, getReferenciasDeMarca, getUsuarios } from "@/lib/queries";
 import { CONFIANZA_VALUES, DOCUMENTO_TIPO_VALUES, DOCUMENTO_TIPOS, IDIOMAS, IDIOMA_VALUES } from "@/lib/tipos";
 import type { SoporteConfianza, SoporteDocumentoTipo, SoporteIdioma } from "@/lib/db";
 import DocumentosManager from "./documentos-manager";
@@ -20,10 +20,11 @@ export default async function DocumentosPage({
   const idiomaFiltro = sp.idioma && IDIOMA_VALUES.includes(sp.idioma as SoporteIdioma) ? (sp.idioma as SoporteIdioma) : undefined;
   const confianzaFiltro = sp.confianza && CONFIANZA_VALUES.includes(sp.confianza as SoporteConfianza) ? (sp.confianza as SoporteConfianza) : undefined;
 
-  const [documentos, fuentes, referencias] = await Promise.all([
+  const [documentos, fuentes, referencias, usuarios] = await Promise.all([
     getDocumentosDeMarca(marca.id, { q: sp.q, tipo: tipoFiltro, idioma: idiomaFiltro, confianza: confianzaFiltro, fuenteId: sp.fuenteId }),
     getFuentesDeMarca(marca.id),
     getReferenciasDeMarca(marca.id),
+    getUsuarios(),
   ]);
 
   return (
@@ -98,7 +99,7 @@ export default async function DocumentosPage({
         {documentos.length} documento{documentos.length === 1 ? "" : "s"}
       </p>
 
-      <DocumentosManager marcaId={marca.id} documentos={documentos} fuentes={fuentes} referencias={referencias} />
+      <DocumentosManager marcaId={marca.id} documentos={documentos} fuentes={fuentes} referencias={referencias} usuarios={usuarios} />
     </div>
   );
 }

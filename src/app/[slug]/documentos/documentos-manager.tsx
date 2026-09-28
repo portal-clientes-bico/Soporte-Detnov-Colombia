@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { getDocumentosDeMarca, getFuentesDeMarca, getReferenciasDeMarca } from "@/lib/queries";
+import type { getDocumentosDeMarca, getFuentesDeMarca, getReferenciasDeMarca, getUsuarios } from "@/lib/queries";
 import { ARCHIVO_MAX_BYTES, CONFIANZAS, CONFIANZA_VALUES, DOCUMENTO_TIPO_VALUES, DOCUMENTO_TIPOS, IDIOMAS, IDIOMA_VALUES } from "@/lib/tipos";
+import { NuevaPreguntaForm } from "../preguntas/preguntas-manager";
 
 type Documento = Awaited<ReturnType<typeof getDocumentosDeMarca>>[number];
 type Fuente = Awaited<ReturnType<typeof getFuentesDeMarca>>[number];
 type Referencia = Awaited<ReturnType<typeof getReferenciasDeMarca>>[number];
+type Usuario = Awaited<ReturnType<typeof getUsuarios>>[number];
 
 const inputClass =
   "w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50";
@@ -19,6 +21,109 @@ function Chevron() {
   return (
     <svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor" aria-hidden="true">
       <path d="M5 3l6 5-6 5V3z" />
+    </svg>
+  );
+}
+
+/** Un icono simple por tipo de documento, para reconocerlo de un vistazo en la lista sin leer
+ * el texto. Varios tipos afines comparten el mismo dibujo (ej. los dos manuales). */
+const ICONOS_TIPO: Record<string, React.ReactNode> = {
+  documento: (
+    <>
+      <path d="M4 1.5h4.5L11 4v10.5H4z" />
+      <path d="M8.5 1.5V4H11" />
+      <path d="M5.5 8h4M5.5 10.5h4" />
+    </>
+  ),
+  libro: (
+    <>
+      <path d="M2 3.5c1.5-.8 3-.8 4.5 0v9c-1.5-.8-3-.8-4.5 0z" />
+      <path d="M14 3.5c-1.5-.8-3-.8-4.5 0v9c1.5-.8 3-.8 4.5 0z" />
+    </>
+  ),
+  codigo: (
+    <>
+      <path d="M5.5 5 2.5 8l3 3" />
+      <path d="M10.5 5l3 3-3 3" />
+    </>
+  ),
+  cableado: (
+    <>
+      <path d="M2 4h3l2 4 2-4h3" />
+      <path d="M4 12h2l1-2 1 2h2" />
+    </>
+  ),
+  catalogo: (
+    <>
+      <rect x="2.5" y="2.5" width="8" height="10" rx="0.5" />
+      <rect x="5" y="5" width="8" height="10" rx="0.5" opacity="0.5" />
+    </>
+  ),
+  certificado: (
+    <>
+      <circle cx="8" cy="6" r="4" />
+      <path d="M6 9.5 5 14l3-1.5L11 14l-1-4.5" />
+      <path d="M6.3 6l1.2 1.2L10 5" />
+    </>
+  ),
+  presentacion: <path d="M2 13V9M6 13V6M10 13V8M14 13V4" />,
+  video: (
+    <>
+      <rect x="1.5" y="3" width="13" height="10" rx="1.2" />
+      <path d="M6.5 6.2 10 8l-3.5 1.8z" fill="currentColor" stroke="none" />
+    </>
+  ),
+  precio: (
+    <>
+      <path d="M2 8 8 2h5v5l-6 6z" />
+      <circle cx="10.5" cy="4.5" r="0.9" fill="currentColor" stroke="none" />
+    </>
+  ),
+  aduana: (
+    <>
+      <path d="M2 5l6-3 6 3-6 3z" />
+      <path d="M2 5v6l6 3 6-3V5" />
+      <path d="M8 8v6" />
+    </>
+  ),
+};
+
+const TIPO_ICONO: Record<string, keyof typeof ICONOS_TIPO> = {
+  DATASHEET: "documento",
+  MANUAL_INSTALACION: "libro",
+  MANUAL_USUARIO: "libro",
+  MANUAL_PROGRAMACION: "codigo",
+  DIAGRAMA_CABLEADO: "cableado",
+  CATALOGO: "catalogo",
+  BROCHURE: "catalogo",
+  GUIA_APLICACION: "libro",
+  CERTIFICADO: "certificado",
+  LISTADO_UL: "certificado",
+  PRESENTACION: "presentacion",
+  CASO_ESTUDIO: "presentacion",
+  VIDEO: "video",
+  SOFTWARE: "codigo",
+  INSTRUCTIVO: "documento",
+  LISTA_PRECIOS: "precio",
+  REGISTRO_EXPORTACION: "aduana",
+  OTRO: "documento",
+};
+
+function IconoTipoDocumento({ tipo }: { tipo: string }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      width="14"
+      height="14"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="shrink-0 text-zinc-500 dark:text-zinc-400"
+    >
+      {ICONOS_TIPO[TIPO_ICONO[tipo] ?? "documento"]}
     </svg>
   );
 }
@@ -200,7 +305,7 @@ function NuevoDocumentoForm({ marcaId, fuentes, referencias }: { marcaId: string
   );
 }
 
-function DocumentoCard({ documento, fuentes, referencias }: { documento: Documento; fuentes: Fuente[]; referencias: Referencia[] }) {
+function DocumentoCard({ documento, fuentes, referencias, usuarios }: { documento: Documento; fuentes: Fuente[]; referencias: Referencia[]; usuarios: Usuario[] }) {
   const router = useRouter();
   const [editando, setEditando] = useState(false);
   const [valores, setValores] = useState({
@@ -293,16 +398,23 @@ function DocumentoCard({ documento, fuentes, referencias }: { documento: Documen
   const sinArchivo = !documento.archivoPath;
 
   return (
-    <div
-      className={`flex flex-col gap-2 rounded-xl border p-4 ${
+    <details
+      className={`group rounded-xl border ${
         sinArchivo
           ? "border-zinc-100 bg-zinc-50 opacity-70 dark:border-zinc-800/60 dark:bg-zinc-900/40"
           : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
       }`}
     >
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <p className="font-medium">{documento.titulo}</p>
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 select-none marker:content-none">
+        <span className="inline-block shrink-0 text-zinc-900 transition-transform group-open:rotate-90 dark:text-zinc-50">
+          <Chevron />
+        </span>
+        <IconoTipoDocumento tipo={documento.tipo} />
+        <p className="font-medium">{documento.titulo}</p>
+      </summary>
+
+      <div className="flex flex-col gap-2 px-4 pb-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
             {DOCUMENTO_TIPOS[documento.tipo]}
             {documento.codigo ? ` · ${documento.codigo}` : ""}
@@ -312,62 +424,66 @@ function DocumentoCard({ documento, fuentes, referencias }: { documento: Documen
             {IDIOMAS[documento.idioma]}
             {documento.fuente ? ` · ${documento.fuente.nombre}` : ""}
           </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-3">
-          <span className={`rounded-full px-2 py-0.5 text-xs ${confianzaBadge[documento.confianza]}`}>{CONFIANZAS[documento.confianza].label}</span>
-          <button type="button" onClick={() => setEditando(true)} className="text-xs text-zinc-500 underline hover:text-zinc-900 dark:hover:text-zinc-50">
-            Editar
-          </button>
-          <button type="button" onClick={handleDelete} disabled={loading} className="text-xs text-red-600 underline hover:text-red-800 disabled:opacity-60 dark:text-red-400">
-            Borrar
-          </button>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-3 text-xs">
-        {url && (
-          <a href={url} target="_blank" rel="noopener noreferrer" className="text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50">
-            Archivo {documento.archivoNombre ? `(${documento.archivoNombre})` : ""}
-          </a>
-        )}
-        {documento.urlOrigen && (
-          <a href={documento.urlOrigen} target="_blank" rel="noopener noreferrer" className="text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50">
-            Fuente original
-          </a>
-        )}
-        {sinArchivo && !documento.urlOrigen && <span className="italic text-zinc-400 dark:text-zinc-500">Sin archivo descargado aun</span>}
-      </div>
-
-      {documento.notas && <p className="text-xs text-zinc-600 dark:text-zinc-400">{documento.notas}</p>}
-
-      <div className="flex flex-wrap items-center gap-1.5">
-        {referenciasVinculadas.map((r) => (
-          <span key={r.id} className="flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-            {r.referencia}
-            <button type="button" onClick={() => handleDesvincular(r.id)} disabled={loading} className="text-zinc-400 hover:text-red-600 dark:hover:text-red-400">
-              ×
+          <div className="flex shrink-0 items-center gap-3">
+            <span className={`rounded-full px-2 py-0.5 text-xs ${confianzaBadge[documento.confianza]}`}>{CONFIANZAS[documento.confianza].label}</span>
+            <button type="button" onClick={() => setEditando(true)} className="text-xs text-zinc-500 underline hover:text-zinc-900 dark:hover:text-zinc-50">
+              Editar
             </button>
-          </span>
-        ))}
-        {referenciasDisponibles.length > 0 && (
-          <span className="flex items-center gap-1">
-            <select value={nuevaReferenciaId} onChange={(e) => setNuevaReferenciaId(e.target.value)} className="rounded-full border border-zinc-300 px-2 py-0.5 text-xs text-zinc-700 outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-              <option value="">+ vincular producto</option>
-              {referenciasDisponibles.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.referencia}
-                </option>
-              ))}
-            </select>
-            {nuevaReferenciaId && (
-              <button type="button" onClick={handleVincular} disabled={loading} className="text-xs text-zinc-500 underline hover:text-zinc-900 dark:hover:text-zinc-50">
-                Vincular
+            <button type="button" onClick={handleDelete} disabled={loading} className="text-xs text-red-600 underline hover:text-red-800 disabled:opacity-60 dark:text-red-400">
+              Borrar
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-3 text-xs">
+          {url && (
+            <a href={url} target="_blank" rel="noopener noreferrer" className="text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50">
+              Archivo {documento.archivoNombre ? `(${documento.archivoNombre})` : ""}
+            </a>
+          )}
+          {documento.urlOrigen && (
+            <a href={documento.urlOrigen} target="_blank" rel="noopener noreferrer" className="text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50">
+              Fuente original
+            </a>
+          )}
+          {sinArchivo && !documento.urlOrigen && <span className="italic text-zinc-400 dark:text-zinc-500">Sin archivo descargado aun</span>}
+        </div>
+
+        {documento.notas && <p className="text-xs text-zinc-600 dark:text-zinc-400">{documento.notas}</p>}
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          {referenciasVinculadas.map((r) => (
+            <span key={r.id} className="flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+              {r.referencia}
+              <button type="button" onClick={() => handleDesvincular(r.id)} disabled={loading} className="text-zinc-400 hover:text-red-600 dark:hover:text-red-400">
+                ×
               </button>
-            )}
-          </span>
-        )}
+            </span>
+          ))}
+          {referenciasDisponibles.length > 0 && (
+            <span className="flex items-center gap-1">
+              <select value={nuevaReferenciaId} onChange={(e) => setNuevaReferenciaId(e.target.value)} className="rounded-full border border-zinc-300 px-2 py-0.5 text-xs text-zinc-700 outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                <option value="">+ vincular producto</option>
+                {referenciasDisponibles.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.referencia}
+                  </option>
+                ))}
+              </select>
+              {nuevaReferenciaId && (
+                <button type="button" onClick={handleVincular} disabled={loading} className="text-xs text-zinc-500 underline hover:text-zinc-900 dark:hover:text-zinc-50">
+                  Vincular
+                </button>
+              )}
+            </span>
+          )}
+        </div>
+
+        <div>
+          <NuevaPreguntaForm marcaId={documento.marcaId} referencias={referencias} usuarios={usuarios} documentos={[]} documentoFijo={documento} triggerLabel="+ Preguntar sobre este documento" />
+        </div>
       </div>
-    </div>
+    </details>
   );
 }
 
@@ -376,12 +492,14 @@ function GrupoDocumentos({
   documentos,
   fuentes,
   referencias,
+  usuarios,
   abiertoPorDefecto,
 }: {
   titulo: string;
   documentos: Documento[];
   fuentes: Fuente[];
   referencias: Referencia[];
+  usuarios: Usuario[];
   abiertoPorDefecto: boolean;
 }) {
   if (documentos.length === 0) return null;
@@ -398,7 +516,7 @@ function GrupoDocumentos({
       </summary>
       <div className="flex flex-col gap-4 p-4 pt-0">
         {documentos.map((d) => (
-          <DocumentoCard key={d.id} documento={d} fuentes={fuentes} referencias={referencias} />
+          <DocumentoCard key={d.id} documento={d} fuentes={fuentes} referencias={referencias} usuarios={usuarios} />
         ))}
       </div>
     </details>
@@ -410,11 +528,13 @@ export default function DocumentosManager({
   documentos,
   fuentes,
   referencias,
+  usuarios,
 }: {
   marcaId: string;
   documentos: Documento[];
   fuentes: Fuente[];
   referencias: Referencia[];
+  usuarios: Usuario[];
 }) {
   const conArchivo = documentos.filter((d) => d.archivoPath);
   const sinArchivo = documentos.filter((d) => !d.archivoPath);
@@ -425,8 +545,8 @@ export default function DocumentosManager({
         <p className="text-sm text-zinc-500 dark:text-zinc-400">Ningun documento coincide con el filtro.</p>
       ) : (
         <>
-          <GrupoDocumentos titulo="Con archivo descargado" documentos={conArchivo} fuentes={fuentes} referencias={referencias} abiertoPorDefecto={true} />
-          <GrupoDocumentos titulo="Sin archivo (pendiente de descarga)" documentos={sinArchivo} fuentes={fuentes} referencias={referencias} abiertoPorDefecto={false} />
+          <GrupoDocumentos titulo="Con archivo descargado" documentos={conArchivo} fuentes={fuentes} referencias={referencias} usuarios={usuarios} abiertoPorDefecto={true} />
+          <GrupoDocumentos titulo="Sin archivo (pendiente de descarga)" documentos={sinArchivo} fuentes={fuentes} referencias={referencias} usuarios={usuarios} abiertoPorDefecto={false} />
         </>
       )}
       <NuevoDocumentoForm marcaId={marcaId} fuentes={fuentes} referencias={referencias} />

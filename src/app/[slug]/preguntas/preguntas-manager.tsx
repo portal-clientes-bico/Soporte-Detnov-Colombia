@@ -326,17 +326,24 @@ export function NuevaPreguntaForm({
   referencias,
   usuarios,
   documentos,
+  documentoFijo,
+  triggerLabel = "+ Nueva pregunta",
 }: {
   marcaId: string;
   referencias: Referencia[];
   usuarios: Usuario[];
   documentos: DocumentoItem[];
+  /** Cuando se abre esta pregunta desde un documento puntual (ver DocumentoCard en
+   * documentos-manager.tsx), queda preseleccionado y ya no hace falta mostrar el selector
+   * completo de documentos -- la pregunta se crea directamente asociada a este. */
+  documentoFijo?: DocumentoItem;
+  triggerLabel?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [valores, setValores] = useState(valoresIniciales());
   const [productos, setProductos] = useState<string[]>([]);
-  const [documentosSeleccionados, setDocumentosSeleccionados] = useState<string[]>([]);
+  const [documentosSeleccionados, setDocumentosSeleccionados] = useState<string[]>(documentoFijo ? [documentoFijo.id] : []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -348,7 +355,7 @@ export function NuevaPreguntaForm({
   if (!open) {
     return (
       <button type="button" onClick={() => setOpen(true)} className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300">
-        + Nueva pregunta
+        {triggerLabel}
       </button>
     );
   }
@@ -370,7 +377,7 @@ export function NuevaPreguntaForm({
     }
     setValores(valoresIniciales());
     setProductos([]);
-    setDocumentosSeleccionados([]);
+    setDocumentosSeleccionados(documentoFijo ? [documentoFijo.id] : []);
     setOpen(false);
     router.refresh();
   }
@@ -389,15 +396,21 @@ export function NuevaPreguntaForm({
           />
         </div>
       )}
-      {documentos.length > 0 && (
-        <div>
-          <p className="mb-1 text-sm text-zinc-600 dark:text-zinc-400">Documentos relacionados</p>
-          <SelectorDocumentos
-            documentos={documentos}
-            seleccionados={documentosSeleccionados}
-            onToggle={(id) => setDocumentosSeleccionados((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))}
-          />
-        </div>
+      {documentoFijo ? (
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          Se asociará al documento <span className="font-medium text-zinc-900 dark:text-zinc-50">{documentoFijo.titulo}</span>.
+        </p>
+      ) : (
+        documentos.length > 0 && (
+          <div>
+            <p className="mb-1 text-sm text-zinc-600 dark:text-zinc-400">Documentos relacionados</p>
+            <SelectorDocumentos
+              documentos={documentos}
+              seleccionados={documentosSeleccionados}
+              onToggle={(id) => setDocumentosSeleccionados((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))}
+            />
+          </div>
+        )
       )}
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       <div className="flex gap-3">
