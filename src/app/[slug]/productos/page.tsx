@@ -33,6 +33,7 @@ function TablaProductos({ slug, productos }: { slug: string; productos: Producto
           <th className="px-3 py-2">Nombre</th>
           <th className="px-3 py-2">Estado</th>
           <th className="px-3 py-2">UL</th>
+          <th className="px-3 py-2">FM</th>
           <th className="px-3 py-2">Lista de precios BICO</th>
           <th className="px-3 py-2 text-right">Docs</th>
           <th className="px-3 py-2 text-right">Hallazgos</th>
@@ -58,6 +59,18 @@ function TablaProductos({ slug, productos }: { slug: string; productos: Producto
                   className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-800 dark:bg-sky-900/40 dark:text-sky-300"
                 >
                   UL
+                </span>
+              ) : (
+                <span className="text-xs text-zinc-400 dark:text-zinc-600">—</span>
+              )}
+            </td>
+            <td className="px-3 py-2">
+              {p.fmAprobado ? (
+                <span
+                  title="Certificado FM Approved (FM Approvals / Approval Guide)"
+                  className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-800 dark:bg-rose-900/40 dark:text-rose-300"
+                >
+                  FM
                 </span>
               ) : (
                 <span className="text-xs text-zinc-400 dark:text-zinc-600">—</span>

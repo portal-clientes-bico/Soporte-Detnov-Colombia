@@ -59,6 +59,9 @@ export interface ProductoConConteo extends Producto {
   /** true si el producto esta vinculado a algun documento tipo LISTADO_UL (expediente de UL
    * Product iQ) -- ver columna "UL" en la tabla de productos. */
   ulListado: boolean;
+  /** true si el producto esta vinculado a algun documento tipo CERTIFICADO cuya fuente es FM
+   * Approvals (Approval Guide) -- ver columna "FM" en la tabla de productos. */
+  fmAprobado: boolean;
 }
 
 const NOMBRE_ESPEC_PRECIO_BICO = "Precio distribucion BICO";
@@ -67,6 +70,8 @@ export async function getProductosDeMarca(marcaId: string, filtro: FiltroProduct
   const db = await leerDb();
   const q = filtro.q?.trim().toLowerCase();
   const docIdsListadoUL = new Set(db.documentos.filter((d) => d.marcaId === marcaId && d.tipo === "LISTADO_UL").map((d) => d.id));
+  const fuenteIdsFM = new Set(db.fuentes.filter((f) => f.marcaId === marcaId && /FM Approvals/i.test(f.nombre)).map((f) => f.id));
+  const docIdsFM = new Set(db.documentos.filter((d) => d.marcaId === marcaId && d.tipo === "CERTIFICADO" && d.fuenteId && fuenteIdsFM.has(d.fuenteId)).map((d) => d.id));
   return db.productos
     .filter((p) => p.marcaId === marcaId)
     .filter((p) => !filtro.familia || p.familia === filtro.familia)
@@ -83,6 +88,7 @@ export async function getProductosDeMarca(marcaId: string, filtro: FiltroProduct
       ...p,
       precioListaBico: p.especificaciones.find((e) => e.grupo === "COMERCIAL" && e.nombre === NOMBRE_ESPEC_PRECIO_BICO)?.valor.split(" · ")[0] ?? null,
       ulListado: db.documentoProductos.some((dp) => dp.productoId === p.id && docIdsListadoUL.has(dp.documentoId)),
+      fmAprobado: db.documentoProductos.some((dp) => dp.productoId === p.id && docIdsFM.has(dp.documentoId)),
       _count: {
         documentos: db.documentoProductos.filter((dp) => dp.productoId === p.id).length,
         hallazgos: db.hallazgos.filter((h) => h.productoId === p.id).length,

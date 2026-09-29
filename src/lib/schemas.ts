@@ -86,7 +86,7 @@ export const documentoCamposSchema = z.object({
   revision: textoOpcional(60),
   fechaEmision: textoOpcional(30),
   idioma: z.enum(IDIOMA_VALUES),
-  fuenteId: textoOpcional(60),
+  fuenteId: textoOpcional(200),
   urlOrigen: urlOpcional,
   confianza: z.enum(CONFIANZA_VALUES),
   notas: textoOpcional(5000),
@@ -109,7 +109,7 @@ export const fuentePatchSchema = fuenteSchema.omit({ marcaId: true }).partial();
 
 export const hallazgoSchema = z.object({
   marcaId: z.string().min(1),
-  productoId: textoOpcional(60),
+  productoId: textoOpcional(200),
   tipo: z.enum(HALLAZGO_TIPO_VALUES),
   estado: z.enum(HALLAZGO_ESTADO_VALUES).optional(),
   titulo: z.string().trim().min(3).max(200),
