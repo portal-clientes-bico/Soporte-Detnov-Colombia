@@ -63,7 +63,7 @@ export type SoporteEstadoTraduccion = "BORRADOR" | "EN_REVISION" | "APROBADO";
 export type SoporteHallazgoTipo = "REGLA" | "DISCREPANCIA" | "PENDIENTE" | "HALLAZGO";
 export type SoporteHallazgoEstado = "ABIERTO" | "RESUELTO";
 export type SoportePreguntaPrioridad = "ALTA" | "MEDIA" | "BAJA";
-export type SoportePreguntaEstado = "ABIERTA" | "CERRADA";
+export type SoportePreguntaEstado = "BORRADOR" | "ABIERTA" | "CERRADA";
 /** Organizacion a la que pertenece un usuario. La "Organizacion" de una pregunta ya no se
  * elige a mano: se consulta a partir del usuario asignado (ver Pregunta.asignadoAUsuarioId
  * y getPreguntasDeMarca en queries.ts). */

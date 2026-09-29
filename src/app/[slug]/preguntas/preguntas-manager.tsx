@@ -3,7 +3,17 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { getDocumentosDeMarca, getPreguntasDeMarca, getReferenciasDeMarca, getUsuarios } from "@/lib/queries";
-import { ARCHIVO_MAX_BYTES, DOCUMENTO_TIPO_VALUES, DOCUMENTO_TIPOS, ORGANIZACIONES, ORGANIZACION_VALUES, PREGUNTA_PRIORIDADES, PREGUNTA_PRIORIDAD_VALUES } from "@/lib/tipos";
+import {
+  ARCHIVO_MAX_BYTES,
+  DOCUMENTO_TIPO_VALUES,
+  DOCUMENTO_TIPOS,
+  ORGANIZACIONES,
+  ORGANIZACION_VALUES,
+  PREGUNTA_ESTADOS,
+  PREGUNTA_ESTADO_VALUES,
+  PREGUNTA_PRIORIDADES,
+  PREGUNTA_PRIORIDAD_VALUES,
+} from "@/lib/tipos";
 import { nombreUsuarioActual } from "@/lib/usuario-actual";
 
 type Pregunta = Awaited<ReturnType<typeof getPreguntasDeMarca>>[number];
@@ -20,12 +30,21 @@ const prioridadBadge: Record<string, string> = {
   BAJA: "bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200",
 };
 
+/** Mismo criterio de tonos que estadoBadge en traducciones-manager.tsx: gris para un borrador
+ * (todavia no esta lista para el equipo), azul mientras esta abierta, zinc oscuro una vez
+ * cerrada. */
+const estadoBadge: Record<string, string> = {
+  BORRADOR: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800/60 dark:text-zinc-400",
+  ABIERTA: "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300",
+  CERRADA: "bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300",
+};
+
 /** Color de fondo/borde de la ficha de la pregunta segun su prioridad -- tonos muy tenues
  * (rojo/naranja/amarillo) para que se note la prioridad de un vistazo sin que el color grite
  * mas que el contenido. */
 const prioridadCardClass: Record<string, string> = {
   ALTA: "border-red-100 bg-red-50/60 dark:border-red-900/30 dark:bg-red-950/10",
-  MEDIA: "border-orange-100 bg-orange-50/60 dark:border-orange-900/30 dark:bg-orange-950/10",
+  MEDIA: "border-orange-200 bg-orange-100/70 dark:border-orange-900/40 dark:bg-orange-950/20",
   BAJA: "border-yellow-100 bg-yellow-50/60 dark:border-yellow-900/30 dark:bg-yellow-950/10",
 };
 
@@ -275,14 +294,30 @@ function CamposPregunta({
   valores,
   onChange,
   usuarios,
+  mostrarEstado,
 }: {
-  valores: { prioridad: string; asignadoAUsuarioId: string; titulo: string; contenido: string; autor: string };
+  valores: { prioridad: string; asignadoAUsuarioId: string; titulo: string; contenido: string; autor: string; estado?: string };
   onChange: (campo: string, valor: string) => void;
   usuarios: Usuario[];
+  /** El estado solo se puede cambiar desde el formulario de edicion de una pregunta existente
+   * -- al crear una nueva, siempre arranca en "Abierta" (ver POST /api/preguntas). */
+  mostrarEstado?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className={`grid grid-cols-1 gap-3 ${mostrarEstado ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}>
+        {mostrarEstado && (
+          <div>
+            <label className="block text-sm text-zinc-600 dark:text-zinc-400">Estado</label>
+            <select value={valores.estado} onChange={(e) => onChange("estado", e.target.value)} className={inputClass}>
+              {PREGUNTA_ESTADO_VALUES.map((e) => (
+                <option key={e} value={e}>
+                  {PREGUNTA_ESTADOS[e]}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div>
           <label className="block text-sm text-zinc-600 dark:text-zinc-400">Prioridad</label>
           <select value={valores.prioridad} onChange={(e) => onChange("prioridad", e.target.value)} className={inputClass}>
@@ -644,6 +679,7 @@ function PreguntaCard({ pregunta, referencias, usuarios, documentos }: { pregunt
   const router = useRouter();
   const [editando, setEditando] = useState(false);
   const [valores, setValores] = useState({
+    estado: pregunta.estado,
     prioridad: pregunta.prioridad,
     asignadoAUsuarioId: pregunta.asignadoAUsuarioId ?? "",
     titulo: pregunta.titulo,
@@ -674,9 +710,12 @@ function PreguntaCard({ pregunta, referencias, usuarios, documentos }: { pregunt
     router.refresh();
   }
 
-  async function toggleEstado() {
+/** Accion rapida de la tarjeta (fuera del formulario de edicion): Borrador -> Publicar,
+   * Abierta -> Cerrar, Cerrada -> Reabrir (vuelve a Abierta, no a Borrador). Cualquier otra
+   * transicion (ej. volver una pregunta a Borrador) se hace desde "Editar". */
+  async function avanzarEstado() {
     setLoading(true);
-    const nuevoEstado = pregunta.estado === "ABIERTA" ? "CERRADA" : "ABIERTA";
+    const nuevoEstado = pregunta.estado === "BORRADOR" ? "ABIERTA" : pregunta.estado === "ABIERTA" ? "CERRADA" : "ABIERTA";
     await fetch(`/api/preguntas/${encodeURIComponent(pregunta.id)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -719,7 +758,7 @@ function PreguntaCard({ pregunta, referencias, usuarios, documentos }: { pregunt
   if (editando) {
     return (
       <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-        <CamposPregunta valores={valores} onChange={(c, v) => setValores((prev) => ({ ...prev, [c]: v }))} usuarios={usuarios} />
+        <CamposPregunta valores={valores} onChange={(c, v) => setValores((prev) => ({ ...prev, [c]: v }))} usuarios={usuarios} mostrarEstado />
 
         <div>
           <p className="mb-1 text-sm text-zinc-600 dark:text-zinc-400">Productos relacionados</p>
@@ -756,7 +795,7 @@ function PreguntaCard({ pregunta, referencias, usuarios, documentos }: { pregunt
 
   return (
     <details
-      className={`group rounded-xl border ${prioridadCardClass[pregunta.prioridad]} ${pregunta.estado === "CERRADA" ? "opacity-70" : ""}`}
+      className={`group rounded-xl border ${prioridadCardClass[pregunta.prioridad]} ${pregunta.estado === "CERRADA" ? "opacity-70" : pregunta.estado === "BORRADOR" ? "border-dashed opacity-90" : ""}`}
     >
       <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 select-none marker:content-none">
         <span className={CHEVRON_CLASS}><Chevron /></span>
@@ -768,9 +807,7 @@ function PreguntaCard({ pregunta, referencias, usuarios, documentos }: { pregunt
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <span className={`rounded-full px-2 py-0.5 text-xs ${prioridadBadge[pregunta.prioridad]}`}>Prioridad {PREGUNTA_PRIORIDADES[pregunta.prioridad]}</span>
-              <span className={`rounded-full px-2 py-0.5 text-xs ${pregunta.estado === "ABIERTA" ? "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300" : "bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300"}`}>
-                {pregunta.estado === "ABIERTA" ? "Abierta" : "Cerrada"}
-              </span>
+              <span className={`rounded-full px-2 py-0.5 text-xs ${estadoBadge[pregunta.estado]}`}>{PREGUNTA_ESTADOS[pregunta.estado]}</span>
               <span
                 className={`rounded-full px-2 py-0.5 text-xs ${pregunta.organizacion ? organizacionBadge[pregunta.organizacion] : SIN_ASIGNAR_BADGE}`}
                 title="Se consulta a partir del usuario asignado (campo 'Asignado a')"
@@ -785,8 +822,8 @@ function PreguntaCard({ pregunta, referencias, usuarios, documentos }: { pregunt
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-3 text-xs">
-            <button type="button" onClick={toggleEstado} disabled={loading} className="text-zinc-500 underline hover:text-zinc-900 disabled:opacity-60 dark:hover:text-zinc-50">
-              {pregunta.estado === "ABIERTA" ? "Cerrar pregunta" : "Reabrir"}
+            <button type="button" onClick={avanzarEstado} disabled={loading} className="text-zinc-500 underline hover:text-zinc-900 disabled:opacity-60 dark:hover:text-zinc-50">
+              {pregunta.estado === "BORRADOR" ? "Publicar" : pregunta.estado === "ABIERTA" ? "Cerrar pregunta" : "Reabrir"}
             </button>
             <button type="button" onClick={() => setEditando(true)} className="text-zinc-500 underline hover:text-zinc-900 dark:hover:text-zinc-50">
               Editar

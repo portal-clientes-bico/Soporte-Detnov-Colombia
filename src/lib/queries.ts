@@ -173,13 +173,14 @@ export async function getProductoDetalle(marcaId: string, id: string) {
     .sort((a, b) => (a.estado === b.estado ? b.createdAt.localeCompare(a.createdAt) : a.estado.localeCompare(b.estado)));
 
   const ordenPrioridad: Record<string, number> = { ALTA: 0, MEDIA: 1, BAJA: 2 };
+  const ordenEstadoPregunta: Record<string, number> = { ABIERTA: 0, BORRADOR: 1, CERRADA: 2 };
   const preguntas = db.preguntaProductos
     .filter((pp) => pp.productoId === id)
     .map((pp) => db.preguntas.find((p) => p.id === pp.preguntaId))
     .filter((p): p is NonNullable<typeof p> => !!p)
     .sort(
       (a, b) =>
-        (a.estado === "ABIERTA" ? 0 : 1) - (b.estado === "ABIERTA" ? 0 : 1) ||
+        (ordenEstadoPregunta[a.estado] ?? 9) - (ordenEstadoPregunta[b.estado] ?? 9) ||
         (ordenPrioridad[a.prioridad] ?? 9) - (ordenPrioridad[b.prioridad] ?? 9) ||
         b.createdAt.localeCompare(a.createdAt),
     );
@@ -285,7 +286,7 @@ export interface FiltroPreguntas {
 }
 
 const ORDEN_PRIORIDAD: Record<string, number> = { ALTA: 0, MEDIA: 1, BAJA: 2 };
-const ORDEN_ESTADO_PREGUNTA: Record<string, number> = { ABIERTA: 0, CERRADA: 1 };
+const ORDEN_ESTADO_PREGUNTA: Record<string, number> = { BORRADOR: 0, ABIERTA: 1, CERRADA: 2 };
 
 export async function getPreguntasDeMarca(marcaId: string, filtro: FiltroPreguntas = {}) {
   const db = await leerDb();

@@ -80,7 +80,15 @@ export default async function PreguntasPage({
             </span>
           )}
         </form>
-        <NuevaPreguntaForm marcaId={marca.id} referencias={referencias} usuarios={usuarios} documentos={documentos} />
+        <div className="flex items-center gap-3">
+          <a
+            href={`/api/marcas/${slug}/preguntas/reporte`}
+            className="rounded-full border border-zinc-300 px-4 py-2 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+          >
+            Descargar reporte (Word)
+          </a>
+          <NuevaPreguntaForm marcaId={marca.id} referencias={referencias} usuarios={usuarios} documentos={documentos} />
+        </div>
       </div>
 
       <PreguntasManager marcaId={marca.id} preguntas={preguntasFiltradas} referencias={referencias} usuarios={usuarios} documentos={documentos} slug={slug} />

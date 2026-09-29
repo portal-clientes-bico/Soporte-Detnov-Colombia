@@ -252,6 +252,7 @@ export const PREGUNTA_PRIORIDADES: Record<SoportePreguntaPrioridad, string> = {
 export const PREGUNTA_PRIORIDAD_VALUES = Object.keys(PREGUNTA_PRIORIDADES) as SoportePreguntaPrioridad[];
 
 export const PREGUNTA_ESTADOS: Record<SoportePreguntaEstado, string> = {
+  BORRADOR: "Borrador",
   ABIERTA: "Abierta",
   CERRADA: "Cerrada",
 };

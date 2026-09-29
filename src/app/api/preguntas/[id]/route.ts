@@ -14,7 +14,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (!pregunta) return false;
     Object.assign(pregunta, datos);
     if (datos.estado === "CERRADA" && !pregunta.fechaCierre) pregunta.fechaCierre = ahora();
-    if (datos.estado === "ABIERTA") pregunta.fechaCierre = null;
+    if (datos.estado === "ABIERTA" || datos.estado === "BORRADOR") pregunta.fechaCierre = null;
     pregunta.updatedAt = ahora();
     return true;
   });

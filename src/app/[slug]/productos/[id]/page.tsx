@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDocumentosDeMarca, getMarcaPorSlug, getProductoDetalle, getReferenciasDeMarca } from "@/lib/queries";
-import { DOCUMENTO_TIPOS, HALLAZGO_TIPOS, PREGUNTA_PRIORIDADES, labelFamilia, labelGrupoEspecificacion, parseEspecificaciones } from "@/lib/tipos";
+import { DOCUMENTO_TIPOS, HALLAZGO_TIPOS, PREGUNTA_ESTADOS, PREGUNTA_PRIORIDADES, labelFamilia, labelGrupoEspecificacion, parseEspecificaciones } from "@/lib/tipos";
 import ProductoEditor from "./producto-editor";
 import CompatibilidadManager from "./compatibilidad-manager";
 import DocumentoVinculoManager from "./documento-vinculo-manager";
@@ -144,8 +144,16 @@ export default async function ProductoDetallePage({ params }: { params: Promise<
                   <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
                     Prioridad {PREGUNTA_PRIORIDADES[p.prioridad]}
                   </span>
-                  <span className={`rounded-full px-2 py-0.5 text-xs ${p.estado === "ABIERTA" ? "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300" : "bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300"}`}>
-                    {p.estado === "ABIERTA" ? "Abierta" : "Cerrada"}
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs ${
+                      p.estado === "ABIERTA"
+                        ? "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300"
+                        : p.estado === "BORRADOR"
+                          ? "bg-zinc-100 text-zinc-500 dark:bg-zinc-800/60 dark:text-zinc-400"
+                          : "bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300"
+                    }`}
+                  >
+                    {PREGUNTA_ESTADOS[p.estado]}
                   </span>
                 </div>
               </li>
