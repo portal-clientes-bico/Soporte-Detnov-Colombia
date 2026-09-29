@@ -205,13 +205,27 @@ function PasswordPanel({ usuarioId, tienePassword }: { usuarioId: string; tieneP
   );
 }
 
+function valoresDesdeUsuario(usuario: Usuario) {
+  return { nombre: usuario.nombre, email: usuario.email ?? "", organizacion: usuario.organizacion ?? "" };
+}
+
 function UsuarioCard({ usuario }: { usuario: Usuario }) {
   const router = useRouter();
   const [editando, setEditando] = useState(false);
-  const [valores, setValores] = useState({ nombre: usuario.nombre, email: usuario.email ?? "", organizacion: usuario.organizacion ?? "" });
+  // OJO: esta tarjeta es una instancia estable (React la reusa por key=usuario.id entre
+  // refrescos), asi que useState solo toma este valor inicial una vez, en el primer render.
+  // Si no se resiembra al abrir "Editar", el formulario puede quedar mostrando nombre/email/
+  // organizacion desactualizados despues de un router.refresh() (ej. otra persona edito este
+  // mismo usuario, o el guardado de la propia tarjeta ya quedo viejo) -- ver handleEditar.
+  const [valores, setValores] = useState(() => valoresDesdeUsuario(usuario));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [esActual, setEsActual] = useState(false);
+
+  function handleEditar() {
+    setValores(valoresDesdeUsuario(usuario));
+    setEditando(true);
+  }
 
   useEffect(() => {
     setEsActual(leerUsuarioActual()?.id === usuario.id);
@@ -280,7 +294,7 @@ function UsuarioCard({ usuario }: { usuario: Usuario }) {
         {error && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>}
       </div>
       <div className="flex shrink-0 gap-3 text-sm">
-        <button type="button" onClick={() => setEditando(true)} className="text-zinc-500 underline hover:text-zinc-900 dark:hover:text-zinc-50">
+        <button type="button" onClick={handleEditar} className="text-zinc-500 underline hover:text-zinc-900 dark:hover:text-zinc-50">
           Editar
         </button>
         <button type="button" onClick={handleDelete} disabled={loading} className="text-red-600 underline hover:text-red-800 disabled:opacity-60 dark:text-red-400">
