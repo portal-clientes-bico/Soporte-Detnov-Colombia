@@ -59,6 +59,7 @@ export type SoporteDocumentoTipo =
 
 export type SoporteIdioma = "EN" | "ES" | "ZH" | "FR" | "OTRO";
 export type SoporteConfianza = "CONFIRMADO" | "PROBABLE" | "PENDIENTE";
+export type SoporteEstadoTraduccion = "BORRADOR" | "EN_REVISION" | "APROBADO";
 export type SoporteHallazgoTipo = "REGLA" | "DISCREPANCIA" | "PENDIENTE" | "HALLAZGO";
 export type SoporteHallazgoEstado = "ABIERTO" | "RESUELTO";
 export type SoportePreguntaPrioridad = "ALTA" | "MEDIA" | "BAJA";
@@ -141,6 +142,12 @@ export interface Documento {
   /** Fecha en que se calcularon los vectores de embedding sobre el texto extraido (null =
    * aun no aplica: requiere textoExtraidoEn). Ver src/lib/embeddings.ts. */
   embeddingsGeneradasEn: string | null;
+  /** Id del Documento (normalmente en ingles) del que este es traduccion. null si este
+   * documento no es traduccion de nada. Ver modulo Traducciones. */
+  traduccionDeId: string | null;
+  /** Estado de revision de la traduccion. Solo tiene sentido cuando traduccionDeId no es
+   * null; para el resto de documentos queda null. */
+  estadoTraduccion: SoporteEstadoTraduccion | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -371,9 +378,27 @@ export async function escribirDb(db: Db): Promise<void> {
   colaEscritura = colaEscritura.then(async () => {
     const tmp = DB_PATH + ".tmp";
     await fs.writeFile(tmp, JSON.stringify(db, null, 2), "utf8");
-    await fs.rename(tmp, DB_PATH);
+    await renombrarConReintento(tmp, DB_PATH);
   });
   await colaEscritura;
+}
+
+/**
+ * data/ vive dentro de una carpeta sincronizada por OneDrive, que a veces retiene un lock breve
+ * sobre db.json mientras lo sube/escanea -- eso hace que fs.rename() falle con EPERM aunque no
+ * haya ningun otro proceso nuestro escribiendo (colaEscritura ya serializa esas escrituras). Es
+ * transitorio: un par de reintentos cortos alcanza. Se nota mas con rafagas de escrituras
+ * seguidas (ej. una carga masiva de documentos), pero en teoria puede pasar con cualquier guardado.
+ */
+async function renombrarConReintento(tmp: string, destino: string, intento = 1): Promise<void> {
+  try {
+    await fs.rename(tmp, destino);
+  } catch (error) {
+    const esEPERM = (error as NodeJS.ErrnoException).code === "EPERM";
+    if (!esEPERM || intento >= 5) throw error;
+    await new Promise((resolve) => setTimeout(resolve, 100 * intento));
+    await renombrarConReintento(tmp, destino, intento + 1);
+  }
 }
 
 /**

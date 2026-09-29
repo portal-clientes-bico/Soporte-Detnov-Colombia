@@ -1,6 +1,7 @@
 import type {
   SoporteConfianza,
   SoporteDocumentoTipo,
+  SoporteEstadoTraduccion,
   SoporteFuenteTipo,
   SoporteHallazgoEstado,
   SoporteHallazgoTipo,
@@ -203,6 +204,14 @@ export const CONFIANZAS: Record<SoporteConfianza, { label: string; descripcion: 
 };
 
 export const CONFIANZA_VALUES = Object.keys(CONFIANZAS) as SoporteConfianza[];
+
+export const ESTADOS_TRADUCCION: Record<SoporteEstadoTraduccion, string> = {
+  BORRADOR: "Borrador",
+  EN_REVISION: "En Revisión",
+  APROBADO: "Aprobado",
+};
+
+export const ESTADO_TRADUCCION_VALUES = Object.keys(ESTADOS_TRADUCCION) as SoporteEstadoTraduccion[];
 
 export const FUENTE_TIPOS: Record<SoporteFuenteTipo, string> = {
   FABRICANTE: "Fabricante",

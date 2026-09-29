@@ -11,6 +11,7 @@ export default function MarcaTabs({ slug }: { slug: string }) {
     { href: `${base}/preguntas`, label: "Preguntas" },
     { href: `${base}/productos`, label: "Productos" },
     { href: `${base}/documentos`, label: "Documentos" },
+    { href: `${base}/traducciones`, label: "Traducciones" },
     { href: `${base}/fuentes`, label: "Fuentes" },
     { href: `${base}/hallazgos`, label: "Hallazgos" },
     { href: `${base}/chatbot`, label: "ChatBot" },

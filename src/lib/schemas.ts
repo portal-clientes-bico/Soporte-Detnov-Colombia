@@ -1,8 +1,9 @@
 import { z } from "zod";
-import type { SoporteOrganizacion } from "@/lib/db";
+import type { SoporteEstadoTraduccion, SoporteOrganizacion } from "@/lib/db";
 import {
   CONFIANZA_VALUES,
   DOCUMENTO_TIPO_VALUES,
+  ESTADO_TRADUCCION_VALUES,
   FAMILIA_PRODUCTO_VALUES,
   FUENTE_TIPO_VALUES,
   HALLAZGO_ESTADO_VALUES,
@@ -45,6 +46,13 @@ const organizacionOpcional = z
   .transform((v) => (v ? v : null))
   .refine((v): v is SoporteOrganizacion | null => v === null || (ORGANIZACION_VALUES as string[]).includes(v), "Organizacion invalida");
 
+const estadoTraduccionOpcional = z
+  .string()
+  .trim()
+  .optional()
+  .transform((v) => (v ? v : null))
+  .refine((v): v is SoporteEstadoTraduccion | null => v === null || (ESTADO_TRADUCCION_VALUES as string[]).includes(v), "Estado de traduccion invalido");
+
 export const marcaSchema = z.object({
   nombre: z.string().trim().min(2).max(100),
   descripcion: textoOpcional(2000),
@@ -82,6 +90,10 @@ export const documentoCamposSchema = z.object({
   urlOrigen: urlOpcional,
   confianza: z.enum(CONFIANZA_VALUES),
   notas: textoOpcional(5000),
+  /** Id del Documento (en ingles, normalmente) del que este es traduccion. Ver modulo
+   * Traducciones -- traducciones-manager.tsx. */
+  traduccionDeId: textoOpcional(200),
+  estadoTraduccion: estadoTraduccionOpcional,
 });
 
 export const fuenteSchema = z.object({

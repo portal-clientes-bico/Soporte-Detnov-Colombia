@@ -109,7 +109,7 @@ const TIPO_ICONO: Record<string, keyof typeof ICONOS_TIPO> = {
   OTRO: "documento",
 };
 
-function IconoTipoDocumento({ tipo }: { tipo: string }) {
+export function IconoTipoDocumento({ tipo }: { tipo: string }) {
   return (
     <svg
       viewBox="0 0 16 16"

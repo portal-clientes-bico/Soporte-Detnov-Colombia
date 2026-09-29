@@ -59,6 +59,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       notas: parsed.data.notas ?? `Adjuntado desde la pregunta: ${pregunta.titulo}`,
       textoExtraidoEn: null,
       embeddingsGeneradasEn: null,
+      traduccionDeId: null,
+      estadoTraduccion: null,
       createdAt: now,
       updatedAt: now,
     });

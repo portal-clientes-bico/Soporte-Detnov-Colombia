@@ -225,6 +225,22 @@ export async function getDocumentosDeMarca(marcaId: string, filtro: FiltroDocume
     .sort((a, b) => a.tipo.localeCompare(b.tipo) || a.titulo.localeCompare(b.titulo));
 }
 
+/** Cada documento en ingles de la marca junto con sus traducciones (normalmente 0 o 1, pero no
+ * se impide tener varias -- ej. una traduccion vieja sin borrar y una nueva). Base del modulo
+ * Traducciones: separar los que ya tienen traducciones.length > 0 de los que no. */
+export async function getTraduccionesDeMarca(marcaId: string) {
+  const db = await leerDb();
+  const originales = db.documentos.filter((d) => d.marcaId === marcaId && d.idioma === "EN");
+  return originales
+    .map((original) => ({
+      original,
+      traducciones: db.documentos
+        .filter((d) => d.traduccionDeId === original.id)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    }))
+    .sort((a, b) => a.original.tipo.localeCompare(b.original.tipo) || a.original.titulo.localeCompare(b.original.titulo));
+}
+
 export async function getFuentesDeMarca(marcaId: string) {
   const db = await leerDb();
   return db.fuentes
