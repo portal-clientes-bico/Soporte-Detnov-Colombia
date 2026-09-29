@@ -43,7 +43,7 @@ const estadoBadge: Record<string, string> = {
  * (rojo/naranja/amarillo) para que se note la prioridad de un vistazo sin que el color grite
  * mas que el contenido. */
 const prioridadCardClass: Record<string, string> = {
-  ALTA: "border-red-100 bg-red-50/60 dark:border-red-900/30 dark:bg-red-950/10",
+  ALTA: "border-red-200 bg-red-100/70 dark:border-red-900/40 dark:bg-red-950/20",
   MEDIA: "border-orange-200 bg-orange-100/70 dark:border-orange-900/40 dark:bg-orange-950/20",
   BAJA: "border-yellow-100 bg-yellow-50/60 dark:border-yellow-900/30 dark:bg-yellow-950/10",
 };
