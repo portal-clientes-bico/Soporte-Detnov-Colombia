@@ -45,7 +45,7 @@ const estadoBadge: Record<string, string> = {
 const prioridadCardClass: Record<string, string> = {
   ALTA: "border-red-200 bg-red-100/70 dark:border-red-900/40 dark:bg-red-950/20",
   MEDIA: "border-orange-200 bg-orange-100/70 dark:border-orange-900/40 dark:bg-orange-950/20",
-  BAJA: "border-yellow-100 bg-yellow-50/60 dark:border-yellow-900/30 dark:bg-yellow-950/10",
+  BAJA: "border-yellow-200 bg-yellow-100/70 dark:border-yellow-900/40 dark:bg-yellow-950/20",
 };
 
 /** Color "negro" para los chevrons desplegables: negro sobre fondo claro, blanco sobre
