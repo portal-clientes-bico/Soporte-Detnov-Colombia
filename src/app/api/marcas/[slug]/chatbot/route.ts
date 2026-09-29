@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { mutarDb, ahora } from "@/lib/db";
+import { mutarDb, ahora, nuevoId } from "@/lib/db";
 import { getContextoChatbot, getMarcaPorSlug } from "@/lib/queries";
 import { chatbotPreguntaSchema } from "@/lib/schemas";
 import { ChatbotApiError, ChatbotConfigError, preguntarChatbot } from "@/lib/chatbot";
@@ -24,6 +24,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       db.usoChatbot.totalCacheReadTokens += uso.cacheReadTokens;
       db.usoChatbot.totalCacheCreationTokens += uso.cacheCreationTokens;
       db.usoChatbot.actualizadoEn = ahora();
+      db.historialChatbot.push({
+        id: nuevoId(),
+        marcaId: marca.id,
+        pregunta: parsed.data.pregunta,
+        respuesta: texto,
+        inputTokens: uso.inputTokens,
+        outputTokens: uso.outputTokens,
+        cacheReadTokens: uso.cacheReadTokens,
+        cacheCreationTokens: uso.cacheCreationTokens,
+        createdAt: ahora(),
+      });
       return db.usoChatbot;
     });
 

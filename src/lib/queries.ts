@@ -400,4 +400,15 @@ export async function getUsoChatbot() {
   return db.usoChatbot;
 }
 
+/** Historial de preguntas y respuestas del ChatBot para una marca, de la mas antigua a la mas
+ * reciente (mismo orden en que se muestran en la pantalla). limite acota cuantas se traen (las
+ * mas recientes) para no cargar toda la historia si ya es larga -- se sigue guardando completa. */
+export async function getHistorialChatbot(marcaId: string, limite = 50) {
+  const db = await leerDb();
+  return db.historialChatbot
+    .filter((c) => c.marcaId === marcaId)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .slice(-limite);
+}
+
 export type { Compatibilidad };

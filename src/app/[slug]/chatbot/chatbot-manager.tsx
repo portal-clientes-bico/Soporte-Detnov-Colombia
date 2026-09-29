@@ -1,13 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import type { UsoChatbot } from "@/lib/db";
+import type { ConsultaChatbot, UsoChatbot } from "@/lib/db";
 
 interface Turno {
+  id: string;
   pregunta: string;
   respuesta: string | null;
   error: string | null;
   loading: boolean;
+}
+
+function turnoDesdeHistorial(c: ConsultaChatbot): Turno {
+  return { id: c.id, pregunta: c.pregunta, respuesta: c.respuesta, error: null, loading: false };
 }
 
 const inputClass =
@@ -21,9 +26,17 @@ function separarFuentes(respuesta: string): { cuerpo: string; fuentes: string | 
   return { cuerpo: respuesta.slice(0, match).trim(), fuentes: respuesta.slice(match).trim() };
 }
 
-export default function ChatbotManager({ slug, usoInicial }: { slug: string; usoInicial: UsoChatbot }) {
+export default function ChatbotManager({
+  slug,
+  usoInicial,
+  historialInicial,
+}: {
+  slug: string;
+  usoInicial: UsoChatbot;
+  historialInicial: ConsultaChatbot[];
+}) {
   const [pregunta, setPregunta] = useState("");
-  const [turnos, setTurnos] = useState<Turno[]>([]);
+  const [turnos, setTurnos] = useState<Turno[]>(() => historialInicial.map(turnoDesdeHistorial));
   const [uso, setUso] = useState(usoInicial);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -32,7 +45,8 @@ export default function ChatbotManager({ slug, usoInicial }: { slug: string; uso
     if (!texto) return;
     setPregunta("");
     const indice = turnos.length;
-    setTurnos((prev) => [...prev, { pregunta: texto, respuesta: null, error: null, loading: true }]);
+    const id = crypto.randomUUID();
+    setTurnos((prev) => [...prev, { id, pregunta: texto, respuesta: null, error: null, loading: true }]);
 
     const res = await fetch(`/api/marcas/${encodeURIComponent(slug)}/chatbot`, {
       method: "POST",
@@ -46,8 +60,8 @@ export default function ChatbotManager({ slug, usoInicial }: { slug: string; uso
     setTurnos((prev) => {
       const copia = [...prev];
       copia[indice] = res.ok
-        ? { pregunta: texto, respuesta: data.respuesta, error: null, loading: false }
-        : { pregunta: texto, respuesta: null, error: data.error ?? "No se pudo obtener respuesta", loading: false };
+        ? { id, pregunta: texto, respuesta: data.respuesta, error: null, loading: false }
+        : { id, pregunta: texto, respuesta: null, error: data.error ?? "No se pudo obtener respuesta", loading: false };
       return copia;
     });
   }
@@ -82,10 +96,10 @@ export default function ChatbotManager({ slug, usoInicial }: { slug: string; uso
       )}
 
       <div className="flex flex-col gap-4">
-        {turnos.map((t, i) => {
+        {turnos.map((t) => {
           const partes = t.respuesta ? separarFuentes(t.respuesta) : null;
           return (
-            <div key={i} className="flex flex-col gap-2 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+            <div key={t.id} className="flex flex-col gap-2 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
               <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">🧑 {t.pregunta}</p>
               {t.loading && <p className="text-sm text-zinc-500 dark:text-zinc-400">Consultando...</p>}
               {t.error && <p className="text-sm text-red-600 dark:text-red-400">{t.error}</p>}

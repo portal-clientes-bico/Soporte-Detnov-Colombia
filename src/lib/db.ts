@@ -221,6 +221,22 @@ export interface UsoChatbot {
   actualizadoEn: string | null;
 }
 
+/** Una pregunta y su respuesta guardadas del ChatBot, para poder revisar el historial de
+ * consultas mas tarde (antes solo vivia en memoria del navegador, se perdia al recargar la
+ * pagina). Por marca, a diferencia de UsoChatbot que es global. */
+export interface ConsultaChatbot {
+  id: string;
+  marcaId: string;
+  pregunta: string;
+  /** Texto completo tal como lo devolvio el modelo, incluida la seccion final de fuentes. */
+  respuesta: string;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  createdAt: string;
+}
+
 export interface Db {
   marcas: Marca[];
   fuentes: Fuente[];
@@ -234,6 +250,7 @@ export interface Db {
   preguntaDocumentos: PreguntaDocumento[];
   usuarios: Usuario[];
   usoChatbot: UsoChatbot;
+  historialChatbot: ConsultaChatbot[];
 }
 
 function dbVacia(): Db {
@@ -250,6 +267,7 @@ function dbVacia(): Db {
     preguntaDocumentos: [],
     usuarios: [],
     usoChatbot: { totalPreguntas: 0, totalInputTokens: 0, totalOutputTokens: 0, totalCacheReadTokens: 0, totalCacheCreationTokens: 0, actualizadoEn: null },
+    historialChatbot: [],
   };
 }
 
@@ -278,6 +296,7 @@ function normalizarDb(parcial: Partial<Db>): Db {
     // totalCacheReadTokens/totalCacheCreationTokens tendria un usoChatbot sin esas llaves, y
     // sumarles encima daria NaN.
     usoChatbot: { ...vacia.usoChatbot, ...parcial.usoChatbot },
+    historialChatbot: parcial.historialChatbot ?? vacia.historialChatbot,
   };
 }
 
