@@ -173,6 +173,7 @@ function SubirTraduccionForm({ original, abierta }: { original: Entrada["origina
 
 function EntradaCard({ entrada }: { entrada: Entrada }) {
   const { original, traducciones } = entrada;
+  const urlOriginal = archivoUrl(original.archivoPath);
   return (
     <details className="group rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
       <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 select-none marker:content-none">
@@ -187,6 +188,18 @@ function EntradaCard({ entrada }: { entrada: Entrada }) {
           {DOCUMENTO_TIPOS[original.tipo]}
           {original.codigo ? ` · ${original.codigo}` : ""}
         </p>
+        {urlOriginal ? (
+          <a
+            href={urlOriginal}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="self-start text-xs text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
+          >
+            Ver documento en ingles {original.archivoNombre ? `(${original.archivoNombre})` : ""}
+          </a>
+        ) : (
+          <p className="text-xs italic text-zinc-400 dark:text-zinc-500">Documento en ingles sin archivo cargado</p>
+        )}
         <div className="flex flex-col gap-1.5">
           {traducciones.map((t) => (
             <FilaTraduccion key={t.id} traduccion={t} />
