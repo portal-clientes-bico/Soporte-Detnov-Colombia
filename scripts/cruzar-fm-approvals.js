@@ -5,12 +5,16 @@
 // para el registro de la Serie FW962*/FW971*/FW982*) en la descripcion del certificado.
 //
 // Uso: node scripts/cruzar-fm-approvals.js [--dry-run]
+// CRUZAR_SERVIDOR/CRUZAR_DB_PATH/CRUZAR_FUENTE_FM_ID permiten apuntar a otro servidor (ej.
+// produccion) leyendo un snapshot de esa base en vez de data/db.json local -- necesario para que
+// el chequeo de idempotencia no se base en el estado local (que ya tiene esta migracion corrida),
+// y para usar el id de Fuente real de ese servidor (la Fuente se crea por separado en cada uno).
 const fs = require("fs");
 const path = require("path");
 
-const DB_PATH = path.join(__dirname, "..", "data", "db.json");
-const SERVIDOR = "http://localhost:3100";
-const FUENTE_FM_ID = "300c845a-4043-4a64-958b-e1ee0f0d4b8e";
+const DB_PATH = process.env.CRUZAR_DB_PATH ? path.resolve(process.env.CRUZAR_DB_PATH) : path.join(__dirname, "..", "data", "db.json");
+const SERVIDOR = process.env.CRUZAR_SERVIDOR || "http://localhost:3100";
+const FUENTE_FM_ID = process.env.CRUZAR_FUENTE_FM_ID || "300c845a-4043-4a64-958b-e1ee0f0d4b8e";
 
 const REGISTROS_FM = [
   {

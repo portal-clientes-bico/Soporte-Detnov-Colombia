@@ -6,11 +6,14 @@
 // productos (ver getProductosDeMarca en src/lib/queries.ts).
 //
 // Uso: node scripts/cruzar-ul-productiq.js [--dry-run]
+// CRUZAR_SERVIDOR/CRUZAR_DB_PATH permiten apuntar a otro servidor (ej. produccion) leyendo un
+// snapshot de esa base en vez de data/db.json local -- necesario para que el chequeo de
+// "ya vinculado" no se base en el estado local (que ya tiene esta migracion corrida).
 const fs = require("fs");
 const path = require("path");
 
-const DB_PATH = path.join(__dirname, "..", "data", "db.json");
-const SERVIDOR = "http://localhost:3100";
+const DB_PATH = process.env.CRUZAR_DB_PATH ? path.resolve(process.env.CRUZAR_DB_PATH) : path.join(__dirname, "..", "data", "db.json");
+const SERVIDOR = process.env.CRUZAR_SERVIDOR || "http://localhost:3100";
 const FUENTE_UL_ID = "seed__fuente__53db13b4-38d1-4f93-89e2-4725603a74dd__UL%20Solutions%20(Product%20iQ)";
 
 // Un registro por documento (CCN.FileNumber) listado en la busqueda "maple armor". "modelos" es
