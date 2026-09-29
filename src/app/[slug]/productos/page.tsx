@@ -32,6 +32,7 @@ function TablaProductos({ slug, productos }: { slug: string; productos: Producto
           <th className="px-3 py-2">Producto</th>
           <th className="px-3 py-2">Nombre</th>
           <th className="px-3 py-2">Estado</th>
+          <th className="px-3 py-2">UL</th>
           <th className="px-3 py-2">Lista de precios BICO</th>
           <th className="px-3 py-2 text-right">Docs</th>
           <th className="px-3 py-2 text-right">Hallazgos</th>
@@ -49,6 +50,18 @@ function TablaProductos({ slug, productos }: { slug: string; productos: Producto
             <td className="px-3 py-2 text-zinc-700 dark:text-zinc-300">{p.nombre}</td>
             <td className="px-3 py-2">
               <span className={`rounded-full px-2 py-0.5 text-xs ${estadoBadgeClass[p.estado]}`}>{PRODUCTO_ESTADOS[p.estado].label}</span>
+            </td>
+            <td className="px-3 py-2">
+              {p.ulListado ? (
+                <span
+                  title="Aparece listado en un expediente de UL Product iQ"
+                  className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-800 dark:bg-sky-900/40 dark:text-sky-300"
+                >
+                  UL
+                </span>
+              ) : (
+                <span className="text-xs text-zinc-400 dark:text-zinc-600">—</span>
+              )}
             </td>
             <td className="px-3 py-2">
               {p.precioListaBico ? (

@@ -56,6 +56,9 @@ export interface FiltroProductos {
 export interface ProductoConConteo extends Producto {
   _count: { documentos: number; hallazgos: number; preguntas: number };
   precioListaBico: string | null;
+  /** true si el producto esta vinculado a algun documento tipo LISTADO_UL (expediente de UL
+   * Product iQ) -- ver columna "UL" en la tabla de productos. */
+  ulListado: boolean;
 }
 
 const NOMBRE_ESPEC_PRECIO_BICO = "Precio distribucion BICO";
@@ -63,6 +66,7 @@ const NOMBRE_ESPEC_PRECIO_BICO = "Precio distribucion BICO";
 export async function getProductosDeMarca(marcaId: string, filtro: FiltroProductos = {}): Promise<ProductoConConteo[]> {
   const db = await leerDb();
   const q = filtro.q?.trim().toLowerCase();
+  const docIdsListadoUL = new Set(db.documentos.filter((d) => d.marcaId === marcaId && d.tipo === "LISTADO_UL").map((d) => d.id));
   return db.productos
     .filter((p) => p.marcaId === marcaId)
     .filter((p) => !filtro.familia || p.familia === filtro.familia)
@@ -78,6 +82,7 @@ export async function getProductosDeMarca(marcaId: string, filtro: FiltroProduct
     .map((p) => ({
       ...p,
       precioListaBico: p.especificaciones.find((e) => e.grupo === "COMERCIAL" && e.nombre === NOMBRE_ESPEC_PRECIO_BICO)?.valor.split(" · ")[0] ?? null,
+      ulListado: db.documentoProductos.some((dp) => dp.productoId === p.id && docIdsListadoUL.has(dp.documentoId)),
       _count: {
         documentos: db.documentoProductos.filter((dp) => dp.productoId === p.id).length,
         hallazgos: db.hallazgos.filter((h) => h.productoId === p.id).length,
