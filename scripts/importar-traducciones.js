@@ -12,13 +12,19 @@
 // Seguro de re-ejecutar: si un documento ya tiene una traduccion con ese mismo archivoNombre,
 // se salta.
 //
-// Uso: node scripts/importar-traducciones.js
+// Uso: node scripts/importar-traducciones.js [--dry-run] [--server=https://...]
+// El matching (que documento EN le corresponde a cada archivo) siempre se hace contra el
+// data/db.json LOCAL -- --server solo cambia a donde se sube el archivo (POST /api/documentos).
+// Antes de subir a un servidor remoto, verificar que sus documentos EN tengan los mismos ids
+// que el data/db.json local (ver verificacion hecha en la sesion antes de usar esto contra
+// produccion).
 const fs = require("fs");
 const path = require("path");
 
 const DB_PATH = path.join(__dirname, "..", "data", "db.json");
 const CARPETA_BASE = "C:/Users/mlope/OneDrive/Escritorio/Traducciones Maple Armor";
-const SERVIDOR = "http://localhost:3100";
+const argServidor = process.argv.find((a) => a.startsWith("--server="));
+const SERVIDOR = argServidor ? argServidor.slice("--server=".length) : "http://localhost:3100";
 
 // Archivos cuyo nombre no sigue el patron "DOC-XXXX" de forma reconocible por regex, resueltos
 // a mano contra data/db.json (ver notas en el plan / mensajes de esta sesion).
@@ -113,10 +119,14 @@ const CONTENT_TYPES = {
   ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 };
 
-async function subirTraduccion(db, original, archivoAbsoluto) {
+async function subirTraduccion(db, original, archivoAbsoluto, forzar) {
   const nombreArchivo = path.basename(archivoAbsoluto);
 
-  const yaExiste = db.documentos.some((d) => d.traduccionDeId === original.id && d.archivoNombre === nombreArchivo);
+  // OJO: esta comprobacion lee siempre el data/db.json LOCAL, nunca el servidor destino (--server
+  // no tiene un endpoint de lectura para esto). Sirve para no duplicar en corridas locales
+  // repetidas; contra un servidor remoto distinto (ej. produccion) no significa nada y hay que
+  // pasar --force despues de confirmar aparte que el destino esta realmente vacio.
+  const yaExiste = !forzar && db.documentos.some((d) => d.traduccionDeId === original.id && d.archivoNombre === nombreArchivo);
   if (yaExiste) {
     console.log(`  [saltado, ya existe] ${nombreArchivo}`);
     return "saltado";
@@ -153,6 +163,7 @@ async function subirTraduccion(db, original, archivoAbsoluto) {
 
 async function main() {
   const dryRun = process.argv.includes("--dry-run");
+  const forzar = process.argv.includes("--force");
   const db = JSON.parse(fs.readFileSync(DB_PATH, "utf8"));
   const marca = db.marcas.find((m) => m.slug === "maple-armor");
   if (!marca) throw new Error("No se encontro la marca maple-armor");
@@ -193,7 +204,7 @@ async function main() {
     }
     // Releer la db en cada iteracion para que la comprobacion "yaExiste" vea lo recien subido.
     const dbActual = JSON.parse(fs.readFileSync(DB_PATH, "utf8"));
-    const resultado = await subirTraduccion(dbActual, match, archivo);
+    const resultado = await subirTraduccion(dbActual, match, archivo, forzar);
     if (resultado === "ok") ok++;
     else if (resultado === "saltado") saltados++;
     else errores++;
