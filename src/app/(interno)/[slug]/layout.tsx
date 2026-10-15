@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getMarcaPorSlug } from "@/lib/queries";
 import MarcaTabs from "./marca-tabs";
+import EditarMarca from "./editar-marca";
 
 export default async function MarcaLayout({
   children,
@@ -20,8 +21,7 @@ export default async function MarcaLayout({
         <Link href="/" className="text-sm text-zinc-500 underline hover:text-zinc-900 dark:hover:text-zinc-50">
           Marcas
         </Link>
-        <h1 className="mt-1 text-2xl font-semibold">{marca.nombre}</h1>
-        {marca.descripcion && <p className="mt-1 max-w-3xl text-sm text-zinc-600 dark:text-zinc-400">{marca.descripcion}</p>}
+        <EditarMarca slug={slug} nombre={marca.nombre} descripcion={marca.descripcion} />
       </div>
 
       <MarcaTabs slug={slug} />

@@ -17,7 +17,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ sl
     const marca = db.marcas.find((m) => m.slug === slug);
     if (!marca) return false;
     if (parsed.data.nombre !== undefined) marca.nombre = parsed.data.nombre;
-    if (parsed.data.descripcion !== undefined) marca.descripcion = parsed.data.descripcion;
+    if (parsed.data.descripcion !== undefined) marca.descripcion = parsed.data.descripcion || null;
     marca.updatedAt = ahora();
     return true;
   });
