@@ -506,6 +506,20 @@ export async function getInstructivoPublicado(marcaId: string, id: string) {
   return i && i.estado === "PUBLICADO" ? i : null;
 }
 
+/** Marcas para el menu del sitio publico de ayuda (/ayuda), con cuantos instructivos
+ * publicados tiene cada una. Solo datos publicos: nada de conteos internos. */
+export async function getMarcasAyuda() {
+  const db = await leerDb();
+  return db.marcas
+    .map((m) => ({
+      slug: m.slug,
+      nombre: m.nombre,
+      descripcion: m.descripcion,
+      publicados: db.instructivos.filter((i) => i.marcaId === m.id && i.estado === "PUBLICADO").length,
+    }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+}
+
 /** Productos que tienen al menos un instructivo publicado (para el filtro del sitio publico). */
 export async function getProductosConInstructivosPublicados(marcaId: string) {
   const publicados = await getInstructivosPublicados(marcaId);
