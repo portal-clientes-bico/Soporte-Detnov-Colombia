@@ -6,6 +6,8 @@ import type {
   SoporteHallazgoEstado,
   SoporteHallazgoTipo,
   SoporteIdioma,
+  SoporteInstructivoEstado,
+  SoporteInstructivoTipo,
   SoporteOrganizacion,
   SoportePreguntaEstado,
   SoportePreguntaPrioridad,
@@ -258,6 +260,46 @@ export const PREGUNTA_ESTADOS: Record<SoportePreguntaEstado, string> = {
 };
 
 export const PREGUNTA_ESTADO_VALUES = Object.keys(PREGUNTA_ESTADOS) as SoportePreguntaEstado[];
+
+export const INSTRUCTIVO_TIPOS: Record<SoporteInstructivoTipo, string> = {
+  INSTRUCTIVO: "Instructivo",
+  DIAGNOSTICO: "Diagnóstico de falla",
+};
+
+export const INSTRUCTIVO_TIPO_VALUES = Object.keys(INSTRUCTIVO_TIPOS) as SoporteInstructivoTipo[];
+
+export const INSTRUCTIVO_ESTADOS: Record<SoporteInstructivoEstado, string> = {
+  EN_ELABORACION: "En elaboración",
+  PUBLICADO: "Publicado",
+};
+
+export const INSTRUCTIVO_ESTADO_VALUES = Object.keys(INSTRUCTIVO_ESTADOS) as SoporteInstructivoEstado[];
+
+/** Imagenes aceptadas dentro de un instructivo (subconjunto de ARCHIVO_TIPOS_PERMITIDOS). */
+export const IMAGEN_TIPOS_PERMITIDOS = ["image/png", "image/jpeg", "image/webp"];
+
+export const IMAGEN_MAX_BYTES = 10 * 1024 * 1024;
+
+/**
+ * Extrae el id de video de un enlace de YouTube (watch?v=, youtu.be/, /shorts/, /embed/,
+ * /live/) o acepta el id suelto de 11 caracteres. Devuelve null si no lo reconoce.
+ */
+export function extraerYoutubeId(entrada: string): string | null {
+  const texto = entrada.trim();
+  if (/^[\w-]{11}$/.test(texto)) return texto;
+  try {
+    const url = new URL(texto);
+    const host = url.hostname.replace(/^www\.|^m\./, "");
+    let id: string | null = null;
+    if (host === "youtu.be") id = url.pathname.slice(1).split("/")[0];
+    else if (host === "youtube.com" || host === "youtube-nocookie.com" || host === "music.youtube.com") {
+      id = url.searchParams.get("v") ?? url.pathname.match(/^\/(?:shorts|embed|live|v)\/([\w-]{11})/)?.[1] ?? null;
+    }
+    return id && /^[\w-]{11}$/.test(id) ? id : null;
+  } catch {
+    return null;
+  }
+}
 
 export const ORGANIZACIONES: Record<SoporteOrganizacion, string> = {
   DISTRIBUIDOR: "Distribuidor",

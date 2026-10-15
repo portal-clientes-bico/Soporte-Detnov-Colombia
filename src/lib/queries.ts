@@ -6,7 +6,9 @@ import type {
   Compatibilidad,
   Documento,
   Fuente,
+  Db,
   Hallazgo,
+  Instructivo,
   Marca,
   Producto,
   SoporteConfianza,
@@ -14,6 +16,8 @@ import type {
   SoporteHallazgoEstado,
   SoporteHallazgoTipo,
   SoporteIdioma,
+  SoporteInstructivoEstado,
+  SoporteInstructivoTipo,
   SoportePreguntaEstado,
   SoportePreguntaPrioridad,
   SoporteProductoEstado,
@@ -437,6 +441,77 @@ export async function getHistorialChatbot(marcaId: string, limite = 50) {
     .filter((c) => c.marcaId === marcaId)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
     .slice(-limite);
+}
+
+export interface FiltroInstructivos {
+  tipo?: SoporteInstructivoTipo;
+  estado?: SoporteInstructivoEstado;
+  productoId?: string;
+  /** Texto libre: busca en titulo, resumen y bloques de texto. */
+  q?: string;
+}
+
+function conProductos(db: Db, i: Instructivo) {
+  const productos = i.productoIds
+    .map((pid) => db.productos.find((p) => p.id === pid))
+    .filter((p): p is Producto => !!p)
+    .map((p) => ({ id: p.id, referencia: p.referencia, nombre: p.nombre }))
+    .sort((a, b) => a.referencia.localeCompare(b.referencia));
+  return { ...i, productos };
+}
+
+function coincideTexto(i: Instructivo, q: string): boolean {
+  const texto = [i.titulo, i.resumen ?? "", ...i.bloques.map((b) => (b.tipo === "TEXTO" ? b.texto : (b.pie ?? "")))]
+    .join(" ")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+  const terminos = q
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+  return terminos.every((t) => texto.includes(t));
+}
+
+/** Instructivos y diagnosticos de fallas de una marca (todos los estados: uso interno).
+ * En elaboracion primero, luego los mas recientes. */
+export async function getInstructivosDeMarca(marcaId: string, filtro: FiltroInstructivos = {}) {
+  const db = await leerDb();
+  return db.instructivos
+    .filter((i) => i.marcaId === marcaId)
+    .filter((i) => !filtro.tipo || i.tipo === filtro.tipo)
+    .filter((i) => !filtro.estado || i.estado === filtro.estado)
+    .filter((i) => !filtro.productoId || i.productoIds.includes(filtro.productoId))
+    .filter((i) => !filtro.q || coincideTexto(i, filtro.q))
+    .map((i) => conProductos(db, i))
+    .sort((a, b) => (a.estado === b.estado ? b.updatedAt.localeCompare(a.updatedAt) : a.estado === "EN_ELABORACION" ? -1 : 1));
+}
+
+export async function getInstructivo(marcaId: string, id: string) {
+  const db = await leerDb();
+  const i = db.instructivos.find((x) => x.id === id && x.marcaId === marcaId);
+  return i ? conProductos(db, i) : null;
+}
+
+/** Solo PUBLICADO: es lo unico que ve el sitio publico de ayuda (/ayuda/<marca>). */
+export async function getInstructivosPublicados(marcaId: string, filtro: Omit<FiltroInstructivos, "estado"> = {}) {
+  const lista = await getInstructivosDeMarca(marcaId, { ...filtro, estado: "PUBLICADO" });
+  return lista.sort((a, b) => a.titulo.localeCompare(b.titulo, "es"));
+}
+
+export async function getInstructivoPublicado(marcaId: string, id: string) {
+  const i = await getInstructivo(marcaId, id);
+  return i && i.estado === "PUBLICADO" ? i : null;
+}
+
+/** Productos que tienen al menos un instructivo publicado (para el filtro del sitio publico). */
+export async function getProductosConInstructivosPublicados(marcaId: string) {
+  const publicados = await getInstructivosPublicados(marcaId);
+  const porId = new Map<string, { id: string; referencia: string; nombre: string }>();
+  for (const i of publicados) for (const p of i.productos) porId.set(p.id, p);
+  return [...porId.values()].sort((a, b) => a.referencia.localeCompare(b.referencia));
 }
 
 export type { Compatibilidad };
