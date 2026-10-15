@@ -72,6 +72,11 @@ paso (bloques de texto, imagenes subidas y videos de YouTube embebidos). Cada re
 
 ## Notas
 
-- Esta herramienta es de uso personal/local: no tiene login ni control de acceso. No la
-  expongas en una red compartida sin agregar autenticacion.
+- **Acceso**: toda la herramienta interna (paginas y rutas `/api/*`) exige iniciar sesion en
+  `/login`. La sesion es una cookie httpOnly firmada con `SESSION_SECRET` (ver `.env.example`;
+  obligatoria en Vercel, en local se genera sola en `data/.session-secret`) y dura 7 dias. Solo
+  quedan publicos `/ayuda/**`, la descarga de archivos (`GET /api/archivos/**`, por donde se
+  sirven las imagenes de los instructivos) y el propio login. Si no existe ningun usuario con
+  contrasena, `/login` ofrece crear la primera cuenta; despues, los usuarios nuevos solo se
+  crean con una sesion iniciada. La regla vive en `src/proxy.ts`.
 - El limite de tamano por archivo subido es 50 MB (`ARCHIVO_MAX_BYTES` en `src/lib/tipos.ts`).
