@@ -50,7 +50,9 @@ src/lib/schemas.ts        Validacion (zod) de los formularios
 src/lib/storage.ts         Guardar/borrar archivos subidos en data/uploads/
 src/lib/semilla.ts         Motor que aplica los datos iniciales (idempotente)
 src/lib/semillas/          Los datos iniciales de cada marca, escritos en codigo
-src/app/[slug]/...         Paginas: Resumen, Referencias, Documentos, Fuentes, Hallazgos
+src/app/(interno)/...      Herramienta interna: marcas, usuarios y src/app/(interno)/[slug]/... (Resumen,
+                           Preguntas, Instructivos, Productos, Documentos, Fuentes, Hallazgos...)
+src/app/(publico)/ayuda/   Sitio publico de ayuda para clientes (sin clave)
 src/app/api/...            Rutas API que usan las paginas
 ```
 
@@ -61,8 +63,20 @@ Maple Armor, crea un archivo en `src/lib/semillas/` con la misma forma que
 `src/lib/semillas/maple-armor.ts` y agregalo al mapa `SEMILLAS` en
 `src/app/api/marcas/[slug]/semilla/route.ts`.
 
+## Instructivos y Diagnostico de Fallas
+
+Pestana de cada marca para registrar preguntas frecuentes de los clientes con su respuesta paso a
+paso (bloques de texto, imagenes subidas y videos de YouTube embebidos). Cada registro esta
+**En elaboracion** o **Publicado**. Solo los publicados se ven en el sitio publico de ayuda,
+`/ayuda/<marca>` (ej. `/ayuda/maple-armor`), que no pide clave ni muestra los enlaces internos.
+
 ## Notas
 
-- Esta herramienta es de uso personal/local: no tiene login ni control de acceso. No la
-  expongas en una red compartida sin agregar autenticacion.
+- **Acceso**: toda la herramienta interna (paginas y rutas `/api/*`) exige iniciar sesion en
+  `/login`. La sesion es una cookie httpOnly firmada con `SESSION_SECRET` (ver `.env.example`;
+  obligatoria en Vercel, en local se genera sola en `data/.session-secret`) y dura 7 dias. Solo
+  quedan publicos `/ayuda/**`, la descarga de archivos (`GET /api/archivos/**`, por donde se
+  sirven las imagenes de los instructivos) y el propio login. Si no existe ningun usuario con
+  contrasena, `/login` ofrece crear la primera cuenta; despues, los usuarios nuevos solo se
+  crean con una sesion iniciada. La regla vive en `src/proxy.ts`.
 - El limite de tamano por archivo subido es 50 MB (`ARCHIVO_MAX_BYTES` en `src/lib/tipos.ts`).

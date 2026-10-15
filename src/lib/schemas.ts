@@ -9,6 +9,8 @@ import {
   HALLAZGO_ESTADO_VALUES,
   HALLAZGO_TIPO_VALUES,
   IDIOMA_VALUES,
+  INSTRUCTIVO_ESTADO_VALUES,
+  INSTRUCTIVO_TIPO_VALUES,
   ORGANIZACION_VALUES,
   PREGUNTA_ESTADO_VALUES,
   PREGUNTA_PRIORIDAD_VALUES,
@@ -155,6 +157,46 @@ export const preguntaArchivoCamposSchema = z.object({
   tipo: z.enum(DOCUMENTO_TIPO_VALUES),
   titulo: z.string().trim().min(3).max(250),
   notas: textoOpcional(2000),
+});
+
+const pieOpcional = z
+  .string()
+  .trim()
+  .max(500)
+  .nullish()
+  .transform((v) => (v ? v : null));
+
+export const bloqueInstructivoSchema = z.discriminatedUnion("tipo", [
+  z.object({ tipo: z.literal("TEXTO"), texto: z.string().trim().min(1, "Hay un bloque de texto vacio").max(20000) }),
+  z.object({
+    tipo: z.literal("IMAGEN"),
+    archivoPath: z
+      .string()
+      .min(1)
+      .max(500)
+      .refine((v) => !v.split("/").some((s) => s === ".." || s === "."), "Ruta de imagen invalida"),
+    archivoNombre: z.string().trim().min(1).max(250),
+    pie: pieOpcional,
+  }),
+  z.object({ tipo: z.literal("VIDEO"), youtubeId: z.string().regex(/^[\w-]{11}$/, "Video de YouTube invalido"), pie: pieOpcional }),
+]);
+
+/** Mismo patron que preguntaCamposSchema: el PATCH se deriva con .partial() para no
+ * convertir campos ausentes en null. */
+export const instructivoCamposSchema = z.object({
+  tipo: z.enum(INSTRUCTIVO_TIPO_VALUES),
+  titulo: z.string().trim().min(3).max(250),
+  resumen: textoOpcional(2000),
+  bloques: z.array(bloqueInstructivoSchema).max(200),
+  productoIds: z.array(z.string().min(1)).max(200),
+});
+
+export const instructivoSchema = instructivoCamposSchema.extend({
+  marcaId: z.string().min(1),
+});
+
+export const instructivoPatchSchema = instructivoCamposSchema.partial().extend({
+  estado: z.enum(INSTRUCTIVO_ESTADO_VALUES).optional(),
 });
 
 export const usuarioSchema = z.object({

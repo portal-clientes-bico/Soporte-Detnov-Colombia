@@ -68,6 +68,9 @@ export type SoportePreguntaEstado = "BORRADOR" | "ABIERTA" | "CERRADA";
  * elige a mano: se consulta a partir del usuario asignado (ver Pregunta.asignadoAUsuarioId
  * y getPreguntasDeMarca en queries.ts). */
 export type SoporteOrganizacion = "DISTRIBUIDOR" | "MAPLE_ARMOR" | "DETNOV";
+export type SoporteInstructivoTipo = "INSTRUCTIVO" | "DIAGNOSTICO";
+/** Solo los PUBLICADO se ven en el sitio publico de ayuda (/ayuda/<marca>), sin clave. */
+export type SoporteInstructivoEstado = "EN_ELABORACION" | "PUBLICADO";
 
 export interface Especificacion {
   grupo: string;
@@ -197,6 +200,35 @@ export interface PreguntaDocumento {
   documentoId: string;
 }
 
+/** Un bloque de la respuesta de un instructivo, en el orden en que se muestra al cliente. */
+export type BloqueInstructivo =
+  | { tipo: "TEXTO"; texto: string }
+  /** archivoPath se sirve por /api/archivos/<archivoPath>, igual que los documentos. */
+  | { tipo: "IMAGEN"; archivoPath: string; archivoNombre: string; pie: string | null }
+  | { tipo: "VIDEO"; youtubeId: string; pie: string | null };
+
+/**
+ * Registro de "Instructivos y Diagnostico de Fallas": una pregunta tipica de los clientes
+ * (titulo) y su respuesta paso a paso (bloques de texto, imagenes y videos de YouTube). A
+ * diferencia de Pregunta (soporte interno del equipo), esto es contenido pensado para el
+ * cliente final y se publica en /ayuda/<marca>.
+ */
+export interface Instructivo {
+  id: string;
+  marcaId: string;
+  tipo: SoporteInstructivoTipo;
+  estado: SoporteInstructivoEstado;
+  titulo: string;
+  resumen: string | null;
+  bloques: BloqueInstructivo[];
+  /** Productos a los que aplica (ids de Producto de la misma marca). */
+  productoIds: string[];
+  /** Primera vez que paso a PUBLICADO (se conserva si luego vuelve a En elaboracion). */
+  publicadoEn: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Usuario {
   id: string;
   nombre: string;
@@ -258,6 +290,7 @@ export interface Db {
   usuarios: Usuario[];
   usoChatbot: UsoChatbot;
   historialChatbot: ConsultaChatbot[];
+  instructivos: Instructivo[];
 }
 
 function dbVacia(): Db {
@@ -275,6 +308,7 @@ function dbVacia(): Db {
     usuarios: [],
     usoChatbot: { totalPreguntas: 0, totalInputTokens: 0, totalOutputTokens: 0, totalCacheReadTokens: 0, totalCacheCreationTokens: 0, actualizadoEn: null },
     historialChatbot: [],
+    instructivos: [],
   };
 }
 
@@ -304,6 +338,7 @@ function normalizarDb(parcial: Partial<Db>): Db {
     // sumarles encima daria NaN.
     usoChatbot: { ...vacia.usoChatbot, ...parcial.usoChatbot },
     historialChatbot: parcial.historialChatbot ?? vacia.historialChatbot,
+    instructivos: parcial.instructivos ?? vacia.instructivos,
   };
 }
 
