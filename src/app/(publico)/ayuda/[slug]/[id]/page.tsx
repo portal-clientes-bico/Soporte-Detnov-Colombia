@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getInstructivoPublicado, getMarcaPorSlug } from "@/lib/queries";
 import { INSTRUCTIVO_TIPOS } from "@/lib/tipos";
 import InstructivoContenido from "../../../../instructivo-contenido";
+import CompartirWhatsapp from "../../../../compartir-whatsapp";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string; id: string }> }): Promise<Metadata> {
   const { slug, id } = await params;
@@ -30,6 +31,9 @@ export default async function AyudaInstructivoPage({ params }: { params: Promise
         <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{INSTRUCTIVO_TIPOS[instructivo.tipo]}</span>
         <h1 className="text-2xl font-semibold leading-tight sm:text-3xl">{instructivo.titulo}</h1>
         {instructivo.resumen && <p className="text-zinc-600 dark:text-zinc-400">{instructivo.resumen}</p>}
+        <div>
+          <CompartirWhatsapp titulo={instructivo.titulo} ruta={`/ayuda/${slug}/${instructivo.id}`} />
+        </div>
         {instructivo.productos.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {instructivo.productos.map((p) => (
@@ -43,9 +47,12 @@ export default async function AyudaInstructivoPage({ params }: { params: Promise
       <div className="rounded-xl border border-zinc-200 bg-white p-5 sm:p-8 dark:border-zinc-800 dark:bg-zinc-900">
         <InstructivoContenido bloques={instructivo.bloques} />
       </div>
-      <p className="text-xs text-zinc-500 dark:text-zinc-400">
-        Última actualización: {new Date(instructivo.updatedAt).toLocaleDateString("es-CO", { dateStyle: "long" })}
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          Última actualización: {new Date(instructivo.updatedAt).toLocaleDateString("es-CO", { dateStyle: "long" })}
+        </p>
+        <CompartirWhatsapp titulo={instructivo.titulo} ruta={`/ayuda/${slug}/${instructivo.id}`} />
+      </div>
     </article>
   );
 }

@@ -7,6 +7,7 @@ import type { getInstructivo, getReferenciasDeMarca } from "@/lib/queries";
 import { extraerYoutubeId, IMAGEN_MAX_BYTES, IMAGEN_TIPOS_PERMITIDOS, INSTRUCTIVO_ESTADOS, INSTRUCTIVO_TIPOS, INSTRUCTIVO_TIPO_VALUES } from "@/lib/tipos";
 import InstructivoContenido from "../../../../instructivo-contenido";
 import { estadoInstructivoBadge } from "../estilos";
+import CompartirWhatsapp from "../../../../compartir-whatsapp";
 
 type Instructivo = NonNullable<Awaited<ReturnType<typeof getInstructivo>>>;
 type Referencia = Awaited<ReturnType<typeof getReferenciasDeMarca>>[number];
@@ -322,9 +323,12 @@ export default function InstructivoEditor({ instructivo, referencias, slug }: { 
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${estadoInstructivoBadge[instructivo.estado]}`}>{INSTRUCTIVO_ESTADOS[instructivo.estado]}</span>
           {publicado ? (
-            <a href={urlPublica} target="_blank" rel="noopener noreferrer" className="text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50">
-              Ver como cliente ↗
-            </a>
+            <>
+              <a href={urlPublica} target="_blank" rel="noopener noreferrer" className="text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50">
+                Ver como cliente ↗
+              </a>
+              <CompartirWhatsapp titulo={instructivo.titulo} ruta={urlPublica} className="px-3 py-1 text-xs" />
+            </>
           ) : (
             <span className="text-xs text-zinc-500 dark:text-zinc-400">Los clientes aun no lo ven.</span>
           )}
