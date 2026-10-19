@@ -15,6 +15,8 @@ import {
   PREGUNTA_ESTADO_VALUES,
   PREGUNTA_PRIORIDAD_VALUES,
   PRODUCTO_ESTADO_VALUES,
+  TAREA_ESTADO_VALUES,
+  TAREA_PRIORIDAD_VALUES,
 } from "@/lib/tipos";
 
 const textoOpcional = (max: number) =>
@@ -197,6 +199,30 @@ export const instructivoSchema = instructivoCamposSchema.extend({
 
 export const instructivoPatchSchema = instructivoCamposSchema.partial().extend({
   estado: z.enum(INSTRUCTIVO_ESTADO_VALUES).optional(),
+});
+
+const fechaDia = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha invalida (AAAA-MM-DD)");
+
+/** Mismo patron que preguntaCamposSchema: el PATCH se deriva con .partial(). */
+export const tareaCamposSchema = z.object({
+  titulo: z.string().trim().min(3).max(250),
+  descripcion: textoOpcional(10000),
+  fecha: fechaDia,
+  fechaPara: z
+    .string()
+    .optional()
+    .transform((v) => (v ? v : null))
+    .refine((v) => v === null || /^\d{4}-\d{2}-\d{2}$/.test(v), "Fecha para invalida (AAAA-MM-DD)"),
+  prioridad: z.enum(TAREA_PRIORIDAD_VALUES),
+  productoId: textoOpcional(60),
+});
+
+export const tareaSchema = tareaCamposSchema.extend({
+  marcaId: z.string().min(1),
+});
+
+export const tareaPatchSchema = tareaCamposSchema.partial().extend({
+  estado: z.enum(TAREA_ESTADO_VALUES).optional(),
 });
 
 export const usuarioSchema = z.object({

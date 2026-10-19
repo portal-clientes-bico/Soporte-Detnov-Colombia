@@ -71,6 +71,8 @@ export type SoporteOrganizacion = "DISTRIBUIDOR" | "MAPLE_ARMOR" | "DETNOV";
 export type SoporteInstructivoTipo = "INSTRUCTIVO" | "DIAGNOSTICO";
 /** Solo los PUBLICADO se ven en el sitio publico de ayuda (/ayuda/<marca>), sin clave. */
 export type SoporteInstructivoEstado = "EN_ELABORACION" | "PUBLICADO";
+export type SoporteTareaPrioridad = "ALTA" | "MEDIA" | "BAJA";
+export type SoporteTareaEstado = "PENDIENTE" | "EN_PROGRESO" | "COMPLETADA";
 
 export interface Especificacion {
   grupo: string;
@@ -229,6 +231,26 @@ export interface Instructivo {
   updatedAt: string;
 }
 
+/** Tarea interna del equipo dentro de una marca (panel "Tareas"). */
+export interface Tarea {
+  id: string;
+  marcaId: string;
+  titulo: string;
+  descripcion: string | null;
+  /** Fecha de la tarea, "AAAA-MM-DD" (por defecto el dia en que se registra). */
+  fecha: string;
+  /** Fecha limite ("fecha para"), "AAAA-MM-DD"; null si no tiene. */
+  fechaPara: string | null;
+  prioridad: SoporteTareaPrioridad;
+  estado: SoporteTareaEstado;
+  /** Producto relacionado (id de Producto de la misma marca), opcional. */
+  productoId: string | null;
+  /** Cuando paso a COMPLETADA (null si no lo esta). */
+  completadaEn: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Usuario {
   id: string;
   nombre: string;
@@ -291,6 +313,7 @@ export interface Db {
   usoChatbot: UsoChatbot;
   historialChatbot: ConsultaChatbot[];
   instructivos: Instructivo[];
+  tareas: Tarea[];
 }
 
 function dbVacia(): Db {
@@ -309,6 +332,7 @@ function dbVacia(): Db {
     usoChatbot: { totalPreguntas: 0, totalInputTokens: 0, totalOutputTokens: 0, totalCacheReadTokens: 0, totalCacheCreationTokens: 0, actualizadoEn: null },
     historialChatbot: [],
     instructivos: [],
+    tareas: [],
   };
 }
 
@@ -339,6 +363,7 @@ function normalizarDb(parcial: Partial<Db>): Db {
     usoChatbot: { ...vacia.usoChatbot, ...parcial.usoChatbot },
     historialChatbot: parcial.historialChatbot ?? vacia.historialChatbot,
     instructivos: parcial.instructivos ?? vacia.instructivos,
+    tareas: parcial.tareas ?? vacia.tareas,
   };
 }
 

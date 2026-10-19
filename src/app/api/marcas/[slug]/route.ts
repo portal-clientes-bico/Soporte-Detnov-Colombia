@@ -34,6 +34,11 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     if (!marca) return null;
     const docs = db.documentos.filter((d) => d.marcaId === marca.id);
     const paths = docs.map((d) => d.archivoPath).filter((p): p is string => !!p);
+    for (const i of db.instructivos.filter((x) => x.marcaId === marca.id)) {
+      for (const b of i.bloques) if (b.tipo === "IMAGEN") paths.push(b.archivoPath);
+    }
+    db.instructivos = db.instructivos.filter((i) => i.marcaId !== marca.id);
+    db.tareas = db.tareas.filter((t) => t.marcaId !== marca.id);
 
     db.documentos = db.documentos.filter((d) => d.marcaId !== marca.id);
     const productoIds = new Set(db.productos.filter((p) => p.marcaId === marca.id).map((p) => p.id));

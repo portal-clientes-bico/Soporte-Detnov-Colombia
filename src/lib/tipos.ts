@@ -12,6 +12,8 @@ import type {
   SoportePreguntaEstado,
   SoportePreguntaPrioridad,
   SoporteProductoEstado,
+  SoporteTareaEstado,
+  SoporteTareaPrioridad,
 } from "@/lib/db";
 
 export const FAMILIAS_PRODUCTO = {
@@ -274,6 +276,22 @@ export const INSTRUCTIVO_ESTADOS: Record<SoporteInstructivoEstado, string> = {
 };
 
 export const INSTRUCTIVO_ESTADO_VALUES = Object.keys(INSTRUCTIVO_ESTADOS) as SoporteInstructivoEstado[];
+
+export const TAREA_PRIORIDADES: Record<SoporteTareaPrioridad, string> = {
+  ALTA: "Alta",
+  MEDIA: "Media",
+  BAJA: "Baja",
+};
+
+export const TAREA_PRIORIDAD_VALUES = Object.keys(TAREA_PRIORIDADES) as SoporteTareaPrioridad[];
+
+export const TAREA_ESTADOS: Record<SoporteTareaEstado, string> = {
+  PENDIENTE: "Pendiente",
+  EN_PROGRESO: "En progreso",
+  COMPLETADA: "Completada",
+};
+
+export const TAREA_ESTADO_VALUES = Object.keys(TAREA_ESTADOS) as SoporteTareaEstado[];
 
 /** Imagenes aceptadas dentro de un instructivo (subconjunto de ARCHIVO_TIPOS_PERMITIDOS). */
 export const IMAGEN_TIPOS_PERMITIDOS = ["image/png", "image/jpeg", "image/webp"];

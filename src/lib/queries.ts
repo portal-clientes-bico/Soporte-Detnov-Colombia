@@ -21,6 +21,8 @@ import type {
   SoportePreguntaEstado,
   SoportePreguntaPrioridad,
   SoporteProductoEstado,
+  SoporteTareaEstado,
+  SoporteTareaPrioridad,
 } from "@/lib/db";
 
 export interface MarcaResumen extends Marca {
@@ -526,6 +528,37 @@ export async function getProductosConInstructivosPublicados(marcaId: string) {
   const porId = new Map<string, { id: string; referencia: string; nombre: string }>();
   for (const i of publicados) for (const p of i.productos) porId.set(p.id, p);
   return [...porId.values()].sort((a, b) => a.referencia.localeCompare(b.referencia));
+}
+
+export interface FiltroTareas {
+  estado?: SoporteTareaEstado;
+  prioridad?: SoporteTareaPrioridad;
+  productoId?: string;
+}
+
+const ORDEN_ESTADO_TAREA: Record<string, number> = { EN_PROGRESO: 0, PENDIENTE: 1, COMPLETADA: 2 };
+
+/** Tareas de una marca: abiertas primero (en progreso, pendiente), luego por fecha limite mas
+ * cercana (las sin fecha al final), luego prioridad. Las completadas, las mas recientes primero. */
+export async function getTareasDeMarca(marcaId: string, filtro: FiltroTareas = {}) {
+  const db = await leerDb();
+  return db.tareas
+    .filter((t) => t.marcaId === marcaId)
+    .filter((t) => !filtro.estado || t.estado === filtro.estado)
+    .filter((t) => !filtro.prioridad || t.prioridad === filtro.prioridad)
+    .filter((t) => !filtro.productoId || t.productoId === filtro.productoId)
+    .map((t) => {
+      const p = t.productoId ? db.productos.find((x) => x.id === t.productoId) : undefined;
+      return { ...t, producto: p ? { id: p.id, referencia: p.referencia, nombre: p.nombre } : null };
+    })
+    .sort((a, b) => {
+      const porEstado = (ORDEN_ESTADO_TAREA[a.estado] ?? 9) - (ORDEN_ESTADO_TAREA[b.estado] ?? 9);
+      if (porEstado) return porEstado;
+      if (a.estado === "COMPLETADA") return (b.completadaEn ?? b.updatedAt).localeCompare(a.completadaEn ?? a.updatedAt);
+      const fa = a.fechaPara ?? "9999-12-31";
+      const fb = b.fechaPara ?? "9999-12-31";
+      return fa.localeCompare(fb) || (ORDEN_PRIORIDAD[a.prioridad] ?? 9) - (ORDEN_PRIORIDAD[b.prioridad] ?? 9) || b.createdAt.localeCompare(a.createdAt);
+    });
 }
 
 export type { Compatibilidad };
