@@ -26,6 +26,7 @@ export async function POST(request: Request) {
       marcaId,
       ...datos,
       especificaciones: textoAEspecificaciones(especificacionesTexto ?? ""),
+      precioAsignado: datos.precioAsignado ?? false,
       createdAt: now,
       updatedAt: now,
     });

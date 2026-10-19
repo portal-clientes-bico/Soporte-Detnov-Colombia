@@ -74,6 +74,7 @@ export const productoSchema = z.object({
   especificacionesTexto: z.string().max(20000).optional(),
   sustituyeA: textoOpcional(60),
   sustituidaPor: textoOpcional(60),
+  precioAsignado: z.boolean().optional(),
 });
 
 export const productoPatchSchema = productoSchema.omit({ marcaId: true }).partial();
@@ -215,6 +216,7 @@ export const tareaCamposSchema = z.object({
     .refine((v) => v === null || /^\d{4}-\d{2}-\d{2}$/.test(v), "Fecha para invalida (AAAA-MM-DD)"),
   prioridad: z.enum(TAREA_PRIORIDAD_VALUES),
   productoId: textoOpcional(60),
+  asignadoAUsuarioId: textoOpcional(60),
 });
 
 export const tareaSchema = tareaCamposSchema.extend({

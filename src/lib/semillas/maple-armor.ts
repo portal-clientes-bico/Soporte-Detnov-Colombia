@@ -1169,7 +1169,7 @@ export const MAPLE_ARMOR_SEMILLA: SemillaMarca = {
       tipo: "PENDIENTE",
       titulo: "Moneda de la lista de precios de distribucion BICO no especificada explicitamente",
       contenido:
-        "La columna 'Precio BICO' usa formato de celda con simbolo '$' y configuracion regional es-CO (codigo de idioma 540A), pero el archivo no declara la moneda de forma explicita. Los valores (ej. USD 558.39 para el panel FW2105) son consistentes en magnitud con precios de distribuidor en dolares, no con pesos colombianos. Se registraron como USD por ese criterio, pero debe confirmarse formalmente con Maple Armor o BICO antes de usarlos en una cotizacion oficial.",
+        "La columna 'Precio BICO' usa formato de celda con simbolo '$' y configuracion regional es-CO (codigo de idioma 540A), pero el archivo no declara la moneda de forma explicita. Los valores son consistentes en magnitud con precios de distribuidor en dolares, no con pesos colombianos. Se registraron como USD por ese criterio, pero debe confirmarse formalmente con Maple Armor o BICO antes de usarlos en una cotizacion oficial.",
     },
     {
       clave: "2026-09-23-discrepancia-fw2202-vs-fw2201",

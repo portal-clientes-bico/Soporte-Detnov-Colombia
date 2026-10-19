@@ -61,7 +61,8 @@ export interface FiltroProductos {
 
 export interface ProductoConConteo extends Producto {
   _count: { documentos: number; hallazgos: number; preguntas: number };
-  precioListaBico: string | null;
+  /** Si el producto tiene precio asignado (el valor no se guarda en el portal). */
+  precioAsignado: boolean;
   /** true si el producto esta vinculado a algun documento tipo LISTADO_UL (expediente de UL
    * Product iQ) -- ver columna "UL" en la tabla de productos. */
   ulListado: boolean;
@@ -69,8 +70,6 @@ export interface ProductoConConteo extends Producto {
    * Approvals (Approval Guide) -- ver columna "FM" en la tabla de productos. */
   fmAprobado: boolean;
 }
-
-const NOMBRE_ESPEC_PRECIO_BICO = "Precio distribucion BICO";
 
 export async function getProductosDeMarca(marcaId: string, filtro: FiltroProductos = {}): Promise<ProductoConConteo[]> {
   const db = await leerDb();
@@ -92,7 +91,7 @@ export async function getProductosDeMarca(marcaId: string, filtro: FiltroProduct
     )
     .map((p) => ({
       ...p,
-      precioListaBico: p.especificaciones.find((e) => e.grupo === "COMERCIAL" && e.nombre === NOMBRE_ESPEC_PRECIO_BICO)?.valor.split(" · ")[0] ?? null,
+      precioAsignado: p.precioAsignado ?? false,
       ulListado: db.documentoProductos.some((dp) => dp.productoId === p.id && docIdsListadoUL.has(dp.documentoId)),
       fmAprobado: db.documentoProductos.some((dp) => dp.productoId === p.id && docIdsFM.has(dp.documentoId)),
       _count: {
@@ -534,6 +533,7 @@ export interface FiltroTareas {
   estado?: SoporteTareaEstado;
   prioridad?: SoporteTareaPrioridad;
   productoId?: string;
+  asignadoAUsuarioId?: string;
 }
 
 const ORDEN_ESTADO_TAREA: Record<string, number> = { EN_PROGRESO: 0, PENDIENTE: 1, COMPLETADA: 2 };
@@ -547,9 +547,18 @@ export async function getTareasDeMarca(marcaId: string, filtro: FiltroTareas = {
     .filter((t) => !filtro.estado || t.estado === filtro.estado)
     .filter((t) => !filtro.prioridad || t.prioridad === filtro.prioridad)
     .filter((t) => !filtro.productoId || t.productoId === filtro.productoId)
+    .filter((t) => !filtro.asignadoAUsuarioId || t.asignadoAUsuarioId === filtro.asignadoAUsuarioId)
     .map((t) => {
       const p = t.productoId ? db.productos.find((x) => x.id === t.productoId) : undefined;
-      return { ...t, producto: p ? { id: p.id, referencia: p.referencia, nombre: p.nombre } : null };
+      const nombreUsuario = (id: string | null | undefined) => (id ? (db.usuarios.find((u) => u.id === id)?.nombre ?? null) : null);
+      return {
+        ...t,
+        asignadoPorUsuarioId: t.asignadoPorUsuarioId ?? null,
+        asignadoAUsuarioId: t.asignadoAUsuarioId ?? null,
+        producto: p ? { id: p.id, referencia: p.referencia, nombre: p.nombre } : null,
+        asignadoPorNombre: nombreUsuario(t.asignadoPorUsuarioId),
+        asignadoANombre: nombreUsuario(t.asignadoAUsuarioId),
+      };
     })
     .sort((a, b) => {
       const porEstado = (ORDEN_ESTADO_TAREA[a.estado] ?? 9) - (ORDEN_ESTADO_TAREA[b.estado] ?? 9);

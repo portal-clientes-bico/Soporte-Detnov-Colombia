@@ -22,6 +22,7 @@ export default function ProductoEditor({ producto, slug }: { producto: Producto;
   const [notas, setNotas] = useState(producto.notas ?? "");
   const [sustituyeA, setSustituyeA] = useState(producto.sustituyeA ?? "");
   const [sustituidaPor, setSustituidaPor] = useState(producto.sustituidaPor ?? "");
+  const [precioAsignado, setPrecioAsignado] = useState(producto.precioAsignado ?? false);
   const [especificacionesTexto, setEspecificacionesTexto] = useState(especificacionesATexto(parseEspecificaciones(producto.especificaciones)));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +34,7 @@ export default function ProductoEditor({ producto, slug }: { producto: Producto;
     const res = await fetch(`/api/productos/${encodeURIComponent(producto.id)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ referencia, nombre, familia, generacion, estado, descripcion, notas, sustituyeA, sustituidaPor, especificacionesTexto }),
+      body: JSON.stringify({ referencia, nombre, familia, generacion, estado, descripcion, notas, sustituyeA, sustituidaPor, precioAsignado, especificacionesTexto }),
     });
     const data = await res.json().catch(() => ({}));
     setLoading(false);
@@ -85,6 +86,9 @@ export default function ProductoEditor({ producto, slug }: { producto: Producto;
                 Sustituida por: <span className="text-zinc-700 dark:text-zinc-300">{producto.sustituidaPor}</span>
               </p>
             )}
+            <p className="text-zinc-500 dark:text-zinc-400">
+              Precio asignado: <span className="text-zinc-700 dark:text-zinc-300">{producto.precioAsignado ? "Sí" : "No"}</span>
+            </p>
           </div>
           <div className="flex shrink-0 gap-3 text-sm">
             <button type="button" onClick={() => setEditando(true)} className="text-zinc-500 underline hover:text-zinc-900 dark:hover:text-zinc-50">
@@ -143,6 +147,12 @@ export default function ProductoEditor({ producto, slug }: { producto: Producto;
           <label className="block text-sm text-zinc-600 dark:text-zinc-400">Sustituida por</label>
           <input value={sustituidaPor} onChange={(e) => setSustituidaPor(e.target.value)} placeholder="producto" className={inputClass} />
         </div>
+      </div>
+      <div>
+        <label className="inline-flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+          <input type="checkbox" checked={precioAsignado} onChange={(e) => setPrecioAsignado(e.target.checked)} />
+          Tiene precio asignado
+        </label>
       </div>
       <div>
         <label className="block text-sm text-zinc-600 dark:text-zinc-400">Descripcion</label>

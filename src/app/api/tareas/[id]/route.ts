@@ -15,6 +15,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (datos.productoId && !db.productos.some((p) => p.id === datos.productoId && p.marcaId === tarea.marcaId)) {
       return { status: 400 as const, error: "El producto no pertenece a esta marca" };
     }
+    if (datos.asignadoAUsuarioId && !db.usuarios.some((u) => u.id === datos.asignadoAUsuarioId)) {
+      return { status: 400 as const, error: "El usuario asignado no existe" };
+    }
     Object.assign(tarea, datos);
     if (datos.estado === "COMPLETADA" && !tarea.completadaEn) tarea.completadaEn = ahora();
     if (datos.estado && datos.estado !== "COMPLETADA") tarea.completadaEn = null;

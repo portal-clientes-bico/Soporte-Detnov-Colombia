@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { getReferenciasDeMarca, getTareasDeMarca } from "@/lib/queries";
+import type { getReferenciasDeMarca, getTareasDeMarca, getUsuarios } from "@/lib/queries";
 import { TAREA_ESTADOS, TAREA_ESTADO_VALUES, TAREA_PRIORIDADES, TAREA_PRIORIDAD_VALUES } from "@/lib/tipos";
 
 type Tarea = Awaited<ReturnType<typeof getTareasDeMarca>>[number];
 type Referencia = Awaited<ReturnType<typeof getReferenciasDeMarca>>[number];
+type Usuario = Awaited<ReturnType<typeof getUsuarios>>[number];
 
 const inputClass =
   "w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50";
@@ -49,9 +50,23 @@ interface Valores {
   fechaPara: string;
   prioridad: string;
   productoId: string;
+  asignadoAUsuarioId: string;
 }
 
-function CamposTarea({ valores, onChange, referencias }: { valores: Valores; onChange: (v: Valores) => void; referencias: Referencia[] }) {
+function CamposTarea({
+  valores,
+  onChange,
+  referencias,
+  usuarios,
+  asignadoPor,
+}: {
+  valores: Valores;
+  onChange: (v: Valores) => void;
+  referencias: Referencia[];
+  usuarios: Usuario[];
+  /** Nombre de quien asigno la tarea (solo lectura: es el usuario conectado al crearla). */
+  asignadoPor: string | null;
+}) {
   const set = (campo: keyof Valores) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     onChange({ ...valores, [campo]: e.target.value });
 
@@ -65,7 +80,7 @@ function CamposTarea({ valores, onChange, referencias }: { valores: Valores; onC
         <label className="block text-sm text-zinc-600 dark:text-zinc-400">Descripción</label>
         <textarea value={valores.descripcion} onChange={set("descripcion")} rows={3} className={inputClass} />
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div>
           <label className="block text-sm text-zinc-600 dark:text-zinc-400">Fecha</label>
           <input type="date" value={valores.fecha} onChange={set("fecha")} required className={inputClass} />
@@ -95,20 +110,45 @@ function CamposTarea({ valores, onChange, referencias }: { valores: Valores; onC
             ))}
           </select>
         </div>
+        <div>
+          <label className="block text-sm text-zinc-600 dark:text-zinc-400">Asignado por</label>
+          <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">{asignadoPor ?? "—"}</p>
+        </div>
+        <div>
+          <label className="block text-sm text-zinc-600 dark:text-zinc-400">Asignado a</label>
+          <select value={valores.asignadoAUsuarioId} onChange={set("asignadoAUsuarioId")} className={inputClass}>
+            <option value="">Sin asignar</option>
+            {usuarios.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.nombre}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
     </div>
   );
 }
 
-export function NuevaTareaForm({ marcaId, referencias }: { marcaId: string; referencias: Referencia[] }) {
+export function NuevaTareaForm({
+  marcaId,
+  referencias,
+  usuarios,
+  usuarioActual,
+}: {
+  marcaId: string;
+  referencias: Referencia[];
+  usuarios: Usuario[];
+  usuarioActual: string | null;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [valores, setValores] = useState<Valores>({ titulo: "", descripcion: "", fecha: "", fechaPara: "", prioridad: "MEDIA", productoId: "" });
+  const [valores, setValores] = useState<Valores>({ titulo: "", descripcion: "", fecha: "", fechaPara: "", prioridad: "MEDIA", productoId: "", asignadoAUsuarioId: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function abrir() {
-    setValores({ titulo: "", descripcion: "", fecha: hoyLocal(), fechaPara: "", prioridad: "MEDIA", productoId: "" });
+    setValores({ titulo: "", descripcion: "", fecha: hoyLocal(), fechaPara: "", prioridad: "MEDIA", productoId: "", asignadoAUsuarioId: "" });
     setError(null);
     setOpen(true);
   }
@@ -143,7 +183,7 @@ export function NuevaTareaForm({ marcaId, referencias }: { marcaId: string; refe
   return (
     <form onSubmit={handleSubmit} className="flex w-full flex-col gap-3 rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
       <p className="font-medium">Nueva tarea</p>
-      <CamposTarea valores={valores} onChange={setValores} referencias={referencias} />
+      <CamposTarea valores={valores} onChange={setValores} referencias={referencias} usuarios={usuarios} asignadoPor={usuarioActual} />
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       <div className="flex gap-2">
         <button type="submit" disabled={loading} className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-60 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300">
@@ -157,7 +197,7 @@ export function NuevaTareaForm({ marcaId, referencias }: { marcaId: string; refe
   );
 }
 
-function TareaCard({ tarea, referencias, hoy }: { tarea: Tarea; referencias: Referencia[]; hoy: string | null }) {
+function TareaCard({ tarea, referencias, usuarios, hoy }: { tarea: Tarea; referencias: Referencia[]; usuarios: Usuario[]; hoy: string | null }) {
   const router = useRouter();
   const [editando, setEditando] = useState(false);
   const [valores, setValores] = useState<Valores | null>(null);
@@ -207,7 +247,7 @@ function TareaCard({ tarea, referencias, hoy }: { tarea: Tarea; referencias: Ref
         }}
         className="flex flex-col gap-3 rounded-xl border border-zinc-300 p-4 dark:border-zinc-700"
       >
-        <CamposTarea valores={valores} onChange={setValores} referencias={referencias} />
+        <CamposTarea valores={valores} onChange={setValores} referencias={referencias} usuarios={usuarios} asignadoPor={tarea.asignadoPorNombre} />
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         <div className="flex gap-2">
           <button type="submit" disabled={loading} className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-60 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300">
@@ -253,6 +293,10 @@ function TareaCard({ tarea, referencias, hoy }: { tarea: Tarea; referencias: Ref
 
       <p className={`font-medium ${completada ? "line-through" : ""}`}>{tarea.titulo}</p>
       {tarea.descripcion && <p className="whitespace-pre-line text-sm text-zinc-600 dark:text-zinc-400">{tarea.descripcion}</p>}
+      <p className="text-xs text-zinc-600 dark:text-zinc-400">
+        Asignado a: <span className="font-medium text-zinc-900 dark:text-zinc-100">{tarea.asignadoANombre ?? "Sin asignar"}</span>
+        {tarea.asignadoPorNombre && <> · Asignado por: {tarea.asignadoPorNombre}</>}
+      </p>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-xs text-zinc-500 dark:text-zinc-400">
@@ -271,6 +315,7 @@ function TareaCard({ tarea, referencias, hoy }: { tarea: Tarea; referencias: Ref
                 fechaPara: tarea.fechaPara ?? "",
                 prioridad: tarea.prioridad,
                 productoId: tarea.productoId ?? "",
+                asignadoAUsuarioId: tarea.asignadoAUsuarioId ?? "",
               });
               setError(null);
               setEditando(true);
@@ -289,7 +334,17 @@ function TareaCard({ tarea, referencias, hoy }: { tarea: Tarea; referencias: Ref
   );
 }
 
-export default function TareasManager({ tareas, referencias, hayFiltros }: { tareas: Tarea[]; referencias: Referencia[]; hayFiltros: boolean }) {
+export default function TareasManager({
+  tareas,
+  referencias,
+  usuarios,
+  hayFiltros,
+}: {
+  tareas: Tarea[];
+  referencias: Referencia[];
+  usuarios: Usuario[];
+  hayFiltros: boolean;
+}) {
   const hoy = useHoy();
 
   if (tareas.length === 0) {
@@ -303,7 +358,7 @@ export default function TareasManager({ tareas, referencias, hayFiltros }: { tar
   return (
     <div className="flex flex-col gap-2">
       {tareas.map((t) => (
-        <TareaCard key={`${t.id}-${t.updatedAt}`} tarea={t} referencias={referencias} hoy={hoy} />
+        <TareaCard key={`${t.id}-${t.updatedAt}`} tarea={t} referencias={referencias} usuarios={usuarios} hoy={hoy} />
       ))}
     </div>
   );

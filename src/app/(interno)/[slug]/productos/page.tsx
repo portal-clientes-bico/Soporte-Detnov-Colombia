@@ -34,7 +34,7 @@ function TablaProductos({ slug, productos }: { slug: string; productos: Producto
           <th className="px-3 py-2">Estado</th>
           <th className="px-3 py-2">UL</th>
           <th className="px-3 py-2">FM</th>
-          <th className="px-3 py-2">Lista de precios BICO</th>
+          <th className="px-3 py-2">Precio asignado</th>
           <th className="px-3 py-2 text-right">Docs</th>
           <th className="px-3 py-2 text-right">Hallazgos</th>
           <th className="px-3 py-2 text-right">Preguntas</th>
@@ -77,12 +77,12 @@ function TablaProductos({ slug, productos }: { slug: string; productos: Producto
               )}
             </td>
             <td className="px-3 py-2">
-              {p.precioListaBico ? (
+              {p.precioAsignado ? (
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
-                  ✓ {p.precioListaBico}
+                  ✓ Sí
                 </span>
               ) : (
-                <span className="text-xs text-zinc-400 dark:text-zinc-600">—</span>
+                <span className="text-xs text-zinc-500 dark:text-zinc-400">No</span>
               )}
             </td>
             <td className="px-3 py-2 text-right text-zinc-500 dark:text-zinc-400">{p._count.documentos}</td>

@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { getMarcaPorSlug, getReferenciasDeMarca, getTareasDeMarca } from "@/lib/queries";
+import { getMarcaPorSlug, getReferenciasDeMarca, getTareasDeMarca, getUsuarios } from "@/lib/queries";
+import { sesionActual } from "@/lib/sesion-actual";
 import { TAREA_ESTADO_VALUES, TAREA_ESTADOS, TAREA_PRIORIDAD_VALUES, TAREA_PRIORIDADES } from "@/lib/tipos";
 import type { SoporteTareaEstado, SoporteTareaPrioridad } from "@/lib/db";
 import TareasManager, { NuevaTareaForm } from "./tareas-manager";
@@ -12,7 +13,7 @@ export default async function TareasPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ estado?: string; prioridad?: string; producto?: string }>;
+  searchParams: Promise<{ estado?: string; prioridad?: string; producto?: string; asignado?: string }>;
 }) {
   const { slug } = await params;
   const sp = await searchParams;
@@ -22,12 +23,15 @@ export default async function TareasPage({
   const estado = sp.estado && TAREA_ESTADO_VALUES.includes(sp.estado as SoporteTareaEstado) ? (sp.estado as SoporteTareaEstado) : undefined;
   const prioridad = sp.prioridad && TAREA_PRIORIDAD_VALUES.includes(sp.prioridad as SoporteTareaPrioridad) ? (sp.prioridad as SoporteTareaPrioridad) : undefined;
   const productoId = sp.producto || undefined;
-  const hayFiltros = !!(estado || prioridad || productoId);
+  const asignadoAUsuarioId = sp.asignado || undefined;
+  const hayFiltros = !!(estado || prioridad || productoId || asignadoAUsuarioId);
 
-  const [tareas, todas, referencias] = await Promise.all([
-    getTareasDeMarca(marca.id, { estado, prioridad, productoId }),
+  const [tareas, todas, referencias, usuarios, sesion] = await Promise.all([
+    getTareasDeMarca(marca.id, { estado, prioridad, productoId, asignadoAUsuarioId }),
     getTareasDeMarca(marca.id),
     getReferenciasDeMarca(marca.id),
+    getUsuarios(),
+    sesionActual(),
   ]);
   const abiertas = todas.filter((t) => t.estado !== "COMPLETADA").length;
 
@@ -68,6 +72,17 @@ export default async function TareasPage({
               ))}
             </select>
           </div>
+          <div>
+            <label className="block text-xs text-zinc-500 dark:text-zinc-400">Asignado a</label>
+            <select name="asignado" defaultValue={asignadoAUsuarioId ?? ""} className={selectClass}>
+              <option value="">Todos</option>
+              {usuarios.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
           <button type="submit" className="rounded-full border border-zinc-300 px-4 py-1.5 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800">
             Filtrar
           </button>
@@ -79,14 +94,14 @@ export default async function TareasPage({
         </form>
       </div>
 
-      <NuevaTareaForm marcaId={marca.id} referencias={referencias} />
+      <NuevaTareaForm marcaId={marca.id} referencias={referencias} usuarios={usuarios} usuarioActual={sesion?.nombre ?? null} />
 
       <p className="text-sm text-zinc-500 dark:text-zinc-400">
         {todas.length} tarea{todas.length === 1 ? "" : "s"} · {abiertas} abierta{abiertas === 1 ? "" : "s"}
         {hayFiltros && ` · mostrando ${tareas.length}`}
       </p>
 
-      <TareasManager tareas={tareas} referencias={referencias} hayFiltros={hayFiltros} />
+      <TareasManager tareas={tareas} referencias={referencias} usuarios={usuarios} hayFiltros={hayFiltros} />
     </div>
   );
 }

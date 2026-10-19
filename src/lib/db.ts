@@ -114,6 +114,10 @@ export interface Producto {
   especificaciones: Especificacion[];
   sustituyeA: string | null;
   sustituidaPor: string | null;
+  /** Solo indica si el producto tiene precio asignado; el valor del precio no se guarda en el
+   * portal. Opcional en el tipo porque los productos anteriores a este campo no lo tienen
+   * (se lee como false). */
+  precioAsignado?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -245,6 +249,11 @@ export interface Tarea {
   estado: SoporteTareaEstado;
   /** Producto relacionado (id de Producto de la misma marca), opcional. */
   productoId: string | null;
+  /** Usuario que creo/asigno la tarea: se toma de la sesion al crearla, no se elige a mano.
+   * Opcional en el tipo porque las tareas creadas antes de este campo no lo tienen. */
+  asignadoPorUsuarioId?: string | null;
+  /** Usuario responsable (id de Usuario), elegido de la lista. */
+  asignadoAUsuarioId?: string | null;
   /** Cuando paso a COMPLETADA (null si no lo esta). */
   completadaEn: string | null;
   createdAt: string;
