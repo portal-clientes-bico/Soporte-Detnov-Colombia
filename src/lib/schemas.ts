@@ -217,6 +217,7 @@ export const tareaCamposSchema = z.object({
   prioridad: z.enum(TAREA_PRIORIDAD_VALUES),
   productoId: textoOpcional(60),
   asignadoAUsuarioId: textoOpcional(60),
+  hallazgos: textoOpcional(10000),
 });
 
 export const tareaSchema = tareaCamposSchema.extend({

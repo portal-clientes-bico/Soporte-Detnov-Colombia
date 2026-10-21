@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { mutarDb, ahora } from "@/lib/db";
 import { tareaPatchSchema } from "@/lib/schemas";
+import { sincronizarHallazgoDeTarea } from "@/lib/tareas";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -22,11 +23,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (datos.estado === "COMPLETADA" && !tarea.completadaEn) tarea.completadaEn = ahora();
     if (datos.estado && datos.estado !== "COMPLETADA") tarea.completadaEn = null;
     tarea.updatedAt = ahora();
-    return { status: 200 as const };
+    const hallazgo = sincronizarHallazgoDeTarea(db, tarea);
+    return { status: 200 as const, hallazgo };
   });
 
   if ("error" in resultado) return NextResponse.json({ error: resultado.error }, { status: resultado.status });
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, hallazgo: resultado.hallazgo });
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {

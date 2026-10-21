@@ -555,6 +555,9 @@ export async function getTareasDeMarca(marcaId: string, filtro: FiltroTareas = {
         ...t,
         asignadoPorUsuarioId: t.asignadoPorUsuarioId ?? null,
         asignadoAUsuarioId: t.asignadoAUsuarioId ?? null,
+        hallazgos: t.hallazgos ?? null,
+        // Solo si el hallazgo sigue existiendo (pudo borrarse desde la pestana Hallazgos).
+        hallazgoId: t.hallazgoId && db.hallazgos.some((h) => h.id === t.hallazgoId) ? t.hallazgoId : null,
         producto: p ? { id: p.id, referencia: p.referencia, nombre: p.nombre } : null,
         asignadoPorNombre: nombreUsuario(t.asignadoPorUsuarioId),
         asignadoANombre: nombreUsuario(t.asignadoAUsuarioId),

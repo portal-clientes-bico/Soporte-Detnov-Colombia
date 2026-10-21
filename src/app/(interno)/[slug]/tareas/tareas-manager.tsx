@@ -51,6 +51,7 @@ interface Valores {
   prioridad: string;
   productoId: string;
   asignadoAUsuarioId: string;
+  hallazgos: string;
 }
 
 function CamposTarea({
@@ -79,6 +80,19 @@ function CamposTarea({
       <div>
         <label className="block text-sm text-zinc-600 dark:text-zinc-400">Descripción</label>
         <textarea value={valores.descripcion} onChange={set("descripcion")} rows={3} className={inputClass} />
+      </div>
+      <div>
+        <label className="block text-sm text-zinc-600 dark:text-zinc-400">Hallazgos</label>
+        <textarea
+          value={valores.hallazgos}
+          onChange={set("hallazgos")}
+          rows={3}
+          placeholder="Lo que se encontro o aprendio al trabajar la tarea (causa, solucion, dato tecnico...)."
+          className={inputClass}
+        />
+        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+          Al marcar la tarea como Completada, esto se registra como hallazgo confirmado en la base de conocimiento y lo usa el ChatBot.
+        </p>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div>
@@ -143,12 +157,12 @@ export function NuevaTareaForm({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [valores, setValores] = useState<Valores>({ titulo: "", descripcion: "", fecha: "", fechaPara: "", prioridad: "MEDIA", productoId: "", asignadoAUsuarioId: "" });
+  const [valores, setValores] = useState<Valores>({ titulo: "", descripcion: "", fecha: "", fechaPara: "", prioridad: "MEDIA", productoId: "", asignadoAUsuarioId: "", hallazgos: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function abrir() {
-    setValores({ titulo: "", descripcion: "", fecha: hoyLocal(), fechaPara: "", prioridad: "MEDIA", productoId: "", asignadoAUsuarioId: "" });
+    setValores({ titulo: "", descripcion: "", fecha: hoyLocal(), fechaPara: "", prioridad: "MEDIA", productoId: "", asignadoAUsuarioId: "", hallazgos: "" });
     setError(null);
     setOpen(true);
   }
@@ -197,7 +211,19 @@ export function NuevaTareaForm({
   );
 }
 
-function TareaCard({ tarea, referencias, usuarios, hoy }: { tarea: Tarea; referencias: Referencia[]; usuarios: Usuario[]; hoy: string | null }) {
+function TareaCard({
+  tarea,
+  referencias,
+  usuarios,
+  hoy,
+  slug,
+}: {
+  tarea: Tarea;
+  referencias: Referencia[];
+  usuarios: Usuario[];
+  hoy: string | null;
+  slug: string;
+}) {
   const router = useRouter();
   const [editando, setEditando] = useState(false);
   const [valores, setValores] = useState<Valores | null>(null);
@@ -293,6 +319,22 @@ function TareaCard({ tarea, referencias, usuarios, hoy }: { tarea: Tarea; refere
 
       <p className={`font-medium ${completada ? "line-through" : ""}`}>{tarea.titulo}</p>
       {tarea.descripcion && <p className="whitespace-pre-line text-sm text-zinc-600 dark:text-zinc-400">{tarea.descripcion}</p>}
+      {tarea.hallazgos && (
+        <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-800 dark:bg-zinc-900/60">
+          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Hallazgos</p>
+          <p className="whitespace-pre-line text-zinc-700 dark:text-zinc-300">{tarea.hallazgos}</p>
+          {tarea.hallazgoId ? (
+            <a href={`/${slug}/hallazgos`} className="mt-1 inline-block text-xs text-emerald-700 underline dark:text-emerald-400">
+              ✓ Registrado como hallazgo confirmado en la base de conocimiento
+            </a>
+          ) : (
+            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Se registrará en la base de conocimiento al completar la tarea.</p>
+          )}
+        </div>
+      )}
+      {completada && !tarea.hallazgos && (
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">Completada sin hallazgos: edítala y escribe los hallazgos para registrarlos en la base de conocimiento.</p>
+      )}
       <p className="text-xs text-zinc-600 dark:text-zinc-400">
         Asignado a: <span className="font-medium text-zinc-900 dark:text-zinc-100">{tarea.asignadoANombre ?? "Sin asignar"}</span>
         {tarea.asignadoPorNombre && <> · Asignado por: {tarea.asignadoPorNombre}</>}
@@ -316,6 +358,7 @@ function TareaCard({ tarea, referencias, usuarios, hoy }: { tarea: Tarea; refere
                 prioridad: tarea.prioridad,
                 productoId: tarea.productoId ?? "",
                 asignadoAUsuarioId: tarea.asignadoAUsuarioId ?? "",
+                hallazgos: tarea.hallazgos ?? "",
               });
               setError(null);
               setEditando(true);
@@ -339,11 +382,13 @@ export default function TareasManager({
   referencias,
   usuarios,
   hayFiltros,
+  slug,
 }: {
   tareas: Tarea[];
   referencias: Referencia[];
   usuarios: Usuario[];
   hayFiltros: boolean;
+  slug: string;
 }) {
   const hoy = useHoy();
 
@@ -358,7 +403,7 @@ export default function TareasManager({
   return (
     <div className="flex flex-col gap-2">
       {tareas.map((t) => (
-        <TareaCard key={`${t.id}-${t.updatedAt}`} tarea={t} referencias={referencias} usuarios={usuarios} hoy={hoy} />
+        <TareaCard key={`${t.id}-${t.updatedAt}`} tarea={t} referencias={referencias} usuarios={usuarios} hoy={hoy} slug={slug} />
       ))}
     </div>
   );

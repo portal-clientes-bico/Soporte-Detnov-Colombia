@@ -174,6 +174,8 @@ export interface Hallazgo {
   estado: SoporteHallazgoEstado;
   titulo: string;
   contenido: string;
+  /** Tarea que genero este hallazgo al completarse (ver panel Tareas), si aplica. */
+  tareaId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -254,6 +256,11 @@ export interface Tarea {
   asignadoPorUsuarioId?: string | null;
   /** Usuario responsable (id de Usuario), elegido de la lista. */
   asignadoAUsuarioId?: string | null;
+  /** Hallazgos encontrados al trabajar la tarea. Al completarla se copian a un Hallazgo de
+   * tipo HALLAZGO (conocimiento confirmado que usa el ChatBot); ver sincronizarHallazgoDeTarea. */
+  hallazgos?: string | null;
+  /** Hallazgo generado por esta tarea (para actualizarlo en vez de duplicarlo). */
+  hallazgoId?: string | null;
   /** Cuando paso a COMPLETADA (null si no lo esta). */
   completadaEn: string | null;
   createdAt: string;

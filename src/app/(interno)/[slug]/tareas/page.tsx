@@ -101,7 +101,7 @@ export default async function TareasPage({
         {hayFiltros && ` · mostrando ${tareas.length}`}
       </p>
 
-      <TareasManager tareas={tareas} referencias={referencias} usuarios={usuarios} hayFiltros={hayFiltros} />
+      <TareasManager tareas={tareas} referencias={referencias} usuarios={usuarios} hayFiltros={hayFiltros} slug={slug} />
     </div>
   );
 }
