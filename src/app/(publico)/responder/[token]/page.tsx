@@ -4,6 +4,7 @@ import { leerDb, type Documento, type IdiomaVista, type Producto } from "@/lib/d
 import { preguntasDelEnlace, resolverPreguntaExterna } from "@/lib/enlace-externo";
 import { IDIOMAS, IDIOMA_VALUES, TEXTOS_PREGUNTA, normalizarIdioma } from "@/lib/idioma";
 import { mensajesDe, textoTraducido } from "@/lib/hilo";
+import { PREGUNTA_PRIORIDAD_VALUES } from "@/lib/tipos";
 import HiloMensajes from "../../../hilo-mensajes";
 import { asegurarTraducciones } from "@/lib/traduccion-preguntas";
 import BanderaIdioma from "../../../bandera-idioma";
@@ -123,25 +124,41 @@ export default async function ResponderPage({
             {textos.menu}
             <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">{abiertas}</span>
           </summary>
-          <ul className="mt-2 flex max-h-72 flex-col gap-1 overflow-y-auto">
-            {menu.map((x) => {
-              const actual = x.id === pregunta.id;
+          <div className="mt-2 flex max-h-80 flex-col gap-3 overflow-y-auto">
+            {PREGUNTA_PRIORIDAD_VALUES.map((prioridad) => {
+              const grupo = menu.filter((x) => x.prioridad === prioridad);
+              if (grupo.length === 0) return null;
               return (
-                <li key={x.id}>
-                  <Link
-                    href={href(idioma, x.id === base.id ? null : x.id)}
-                    aria-current={actual ? "page" : undefined}
-                    className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm ${
-                      actual ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900" : "hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                    }`}
-                  >
-                    <span className="min-w-0 truncate">{tituloDe(x)}</span>
-                    <span className="shrink-0 text-xs opacity-70">{x.respuesta ? textos.conRespuesta : textos.sinRespuestaCorto}</span>
-                  </Link>
-                </li>
+                <div key={prioridad}>
+                  <p className="mb-1 flex items-center gap-2 px-1 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                    <span className={`rounded-full px-2 py-0.5 ${PRIORIDAD_BADGE[prioridad]}`}>
+                      {TEXTOS_PREGUNTA[idioma].prioridad}: {TEXTOS_PREGUNTA[idioma].prioridades[prioridad]}
+                    </span>
+                    <span>{grupo.length}</span>
+                  </p>
+                  <ul className="flex flex-col gap-1">
+                    {grupo.map((x) => {
+                      const actual = x.id === pregunta.id;
+                      return (
+                        <li key={x.id}>
+                          <Link
+                            href={href(idioma, x.id === base.id ? null : x.id)}
+                            aria-current={actual ? "page" : undefined}
+                            className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm ${
+                              actual ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900" : "hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                            }`}
+                          >
+                            <span className="min-w-0 truncate">{tituloDe(x)}</span>
+                            <span className="shrink-0 text-xs opacity-70">{x.respuesta ? textos.conRespuesta : textos.sinRespuestaCorto}</span>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
               );
             })}
-          </ul>
+          </div>
         </details>
       </header>
 
