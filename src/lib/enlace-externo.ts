@@ -1,6 +1,6 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
-import { leerDb, ahora, type Db, type Pregunta } from "@/lib/db";
+import { ahora, type Db, type Pregunta } from "@/lib/db";
 
 /** Token aleatorio de 32 bytes (no adivinable): es la unica "clave" del enlace externo. */
 export function nuevoTokenEnlace(): string {
@@ -16,10 +16,25 @@ export function preguntaPorToken(db: Db, token: string): Pregunta | null {
   return db.preguntas.find((p) => p.enlaceExterno?.token === token) ?? null;
 }
 
-export async function leerPreguntaPorToken(token: string): Promise<{ db: Db; pregunta: Pregunta } | null> {
-  const db = await leerDb();
-  const pregunta = preguntaPorToken(db, token);
-  return pregunta ? { db, pregunta } : null;
+/**
+ * Preguntas no resueltas (ABIERTA) de la misma marca que la pregunta del enlace: quien entra
+ * con el enlace puede consultarlas y responderlas desde el menu superior. Los borradores
+ * (internos) y las cerradas no se muestran, salvo la propia pregunta del enlace.
+ */
+export function preguntasDelEnlace(db: Db, base: Pregunta): Pregunta[] {
+  return db.preguntas
+    .filter((p) => p.marcaId === base.marcaId && (p.id === base.id || p.estado === "ABIERTA"))
+    .sort((a, b) => (a.id === base.id ? -1 : b.id === base.id ? 1 : b.createdAt.localeCompare(a.createdAt)));
+}
+
+/** Pregunta que se consulta o responde con el enlace: la del token o, si se indica otra, una
+ * de las que permite el menu (misma marca y no resuelta). null si no esta permitida. */
+export function resolverPreguntaExterna(db: Db, token: string, preguntaId?: string | null): { base: Pregunta; pregunta: Pregunta } | null {
+  const base = preguntaPorToken(db, token);
+  if (!base) return null;
+  if (!preguntaId || preguntaId === base.id) return { base, pregunta: base };
+  const pregunta = preguntasDelEnlace(db, base).find((p) => p.id === preguntaId);
+  return pregunta ? { base, pregunta } : null;
 }
 
 /**

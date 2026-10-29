@@ -4,6 +4,9 @@ import type { IdiomaVista } from "@/lib/db";
 export const TEXTOS_EXTERNO = {
   es: {
     titulo: "Pregunta de soporte técnico",
+    menu: "Preguntas no resueltas",
+    conRespuesta: "Con respuesta",
+    sinRespuestaCorto: "Sin respuesta",
     intro: "Detnov Colombia le invita a responder esta pregunta. Puede escribir su respuesta en español, inglés o chino y adjuntar documentos.",
     marca: "Marca",
     productos: "Productos relacionados",
@@ -34,6 +37,9 @@ export const TEXTOS_EXTERNO = {
   },
   en: {
     titulo: "Technical support question",
+    menu: "Unresolved questions",
+    conRespuesta: "Answered",
+    sinRespuestaCorto: "No answer",
     intro: "Detnov Colombia invites you to answer this question. You can write your answer in English, Spanish or Chinese and attach documents.",
     marca: "Brand",
     productos: "Related products",
@@ -64,6 +70,9 @@ export const TEXTOS_EXTERNO = {
   },
   zh: {
     titulo: "技术支持问题",
+    menu: "未解决的问题",
+    conRespuesta: "已回答",
+    sinRespuestaCorto: "未回答",
     intro: "Detnov Colombia 邀请您回答此问题。您可以用中文、英文或西班牙语作答，并上传附件。",
     marca: "品牌",
     productos: "相关产品",

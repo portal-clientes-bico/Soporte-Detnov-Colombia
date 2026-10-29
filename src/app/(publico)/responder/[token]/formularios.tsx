@@ -29,7 +29,7 @@ function useNombre(): [string, (v: string) => void] {
   return [nombre, guardar];
 }
 
-export default function FormulariosExterno({ token, textos }: { token: string; textos: TextosExterno }) {
+export default function FormulariosExterno({ token, preguntaId, textos }: { token: string; preguntaId: string; textos: TextosExterno }) {
   const router = useRouter();
   const [nombre, setNombre] = useNombre();
   const [respuesta, setRespuesta] = useState("");
@@ -47,7 +47,7 @@ export default function FormulariosExterno({ token, textos }: { token: string; t
     const res = await fetch(`/api/externo/${encodeURIComponent(token)}/respuesta`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nombre, respuesta }),
+      body: JSON.stringify({ nombre, respuesta, preguntaId }),
     }).catch(() => null);
     const data = (await res?.json().catch(() => ({}))) ?? {};
     setEnviando(null);
@@ -68,6 +68,7 @@ export default function FormulariosExterno({ token, textos }: { token: string; t
     setMensaje(null);
     const formData = new FormData();
     formData.set("nombre", nombre);
+    formData.set("preguntaId", preguntaId);
     formData.set("titulo", titulo || archivo.name);
     formData.set("file", archivo);
     const res = await fetch(`/api/externo/${encodeURIComponent(token)}/archivos`, { method: "POST", body: formData }).catch(() => null);

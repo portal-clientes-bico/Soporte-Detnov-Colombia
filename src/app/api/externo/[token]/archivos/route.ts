@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { leerDb } from "@/lib/db";
-import { preguntaPorToken } from "@/lib/enlace-externo";
+import { resolverPreguntaExterna } from "@/lib/enlace-externo";
 import { adjuntarArchivoAPregunta, PreguntaNoEncontradaError } from "@/lib/preguntas-archivos";
 import { ArchivoValidationError } from "@/lib/storage";
 
@@ -27,7 +27,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     return NextResponse.json({ error: "Select a file / Selecciona un archivo" }, { status: 400 });
   }
 
-  const pregunta = preguntaPorToken(await leerDb(), token);
+  const preguntaId = formData.get("preguntaId");
+  const pregunta = resolverPreguntaExterna(await leerDb(), token, typeof preguntaId === "string" ? preguntaId : null)?.pregunta;
   if (!pregunta) return NextResponse.json({ error: "Link not valid / Enlace no valido" }, { status: 404 });
   if (pregunta.estado === "CERRADA") return NextResponse.json({ error: "Question closed / Pregunta cerrada" }, { status: 409 });
 

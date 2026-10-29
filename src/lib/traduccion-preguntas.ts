@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import type { IdiomaVista, Pregunta, TraduccionPregunta } from "@/lib/db";
+import { mutarDb, type IdiomaVista, type Pregunta, type TraduccionPregunta } from "@/lib/db";
 import { contieneCJK } from "@/lib/idioma";
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
@@ -34,6 +34,39 @@ export function traduccionVigente(p: Pregunta, idioma: IdiomaVista): TraduccionP
 export function requiereTraduccion(p: Pregunta, idioma: IdiomaVista): boolean {
   if (idioma !== "es") return true;
   return contieneCJK(p.titulo) || contieneCJK(p.contenido) || contieneCJK(p.respuesta);
+}
+
+/**
+ * Traduce (y guarda) las preguntas que no tengan traduccion vigente al idioma, de a varias en
+ * paralelo. Devuelve las traducciones vigentes por id; las que fallen se muestran en original.
+ */
+export async function asegurarTraducciones(preguntas: Pregunta[], idioma: IdiomaVista, maximo = 20): Promise<Map<string, TraduccionPregunta>> {
+  const resultado = new Map<string, TraduccionPregunta>();
+  const pendientes: Pregunta[] = [];
+  for (const p of preguntas) {
+    const t = traduccionVigente(p, idioma);
+    if (t) resultado.set(p.id, t);
+    else if (requiereTraduccion(p, idioma) && pendientes.length < maximo) pendientes.push(p);
+  }
+  const nuevas: { id: string; t: TraduccionPregunta }[] = [];
+  for (let i = 0; i < pendientes.length; i += 4) {
+    const grupo = pendientes.slice(i, i + 4);
+    const res = await Promise.allSettled(grupo.map((p) => traducirPregunta(p, idioma)));
+    res.forEach((r, j) => {
+      if (r.status === "fulfilled") nuevas.push({ id: grupo[j].id, t: r.value });
+      else console.error("No se pudo traducir la pregunta:", r.reason);
+    });
+  }
+  if (nuevas.length > 0) {
+    await mutarDb((db) => {
+      for (const { id, t } of nuevas) {
+        const p = db.preguntas.find((x) => x.id === id);
+        if (p && huellaPregunta(p) === t.huella) p.traducciones = { ...p.traducciones, [idioma]: t };
+      }
+    });
+    for (const { id, t } of nuevas) resultado.set(id, t);
+  }
+  return resultado;
 }
 
 const SYSTEM = `Eres traductor tecnico de una empresa colombiana que da soporte a sistemas de deteccion y alarma de incendio (paneles, lazos, detectores, modulos, fuentes, baterias).
