@@ -94,23 +94,61 @@ export default async function ResponderPage({
   const mensajes = mensajesDe(pregunta);
   const locale = idioma === "zh" ? "zh-CN" : idioma === "en" ? "en-US" : "es-CO";
   const pActual = pregunta.id === base.id ? null : pregunta.id;
-  const abiertas = menu.filter((x) => x.estado === "ABIERTA").length;
+  const abiertas = menu.length;
+
+  const listaPreguntas = (
+    <div className="flex flex-col gap-4">
+      {PREGUNTA_PRIORIDAD_VALUES.map((prioridad) => {
+        const grupo = menu.filter((x) => x.prioridad === prioridad);
+        if (grupo.length === 0) return null;
+        return (
+          <div key={prioridad}>
+            <p className="mb-1 flex items-center gap-2 px-1 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+              <span className={`rounded-full px-2 py-0.5 ${PRIORIDAD_BADGE[prioridad]}`}>
+                {TEXTOS_PREGUNTA[idioma].prioridad}: {TEXTOS_PREGUNTA[idioma].prioridades[prioridad]}
+              </span>
+              <span>{grupo.length}</span>
+            </p>
+            <ul className="flex flex-col gap-1">
+              {grupo.map((x) => {
+                const actual = x.id === pregunta.id;
+                return (
+                  <li key={x.id}>
+                    <Link
+                      href={href(idioma, x.id === base.id ? null : x.id)}
+                      aria-current={actual ? "page" : undefined}
+                      className={`flex items-start justify-between gap-3 rounded-lg px-3 py-2 text-sm ${
+                        actual ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900" : "hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                      }`}
+                    >
+                      <span className="min-w-0 line-clamp-2">{tituloDe(x)}</span>
+                      <span className="mt-0.5 shrink-0 text-xs opacity-70">{x.respuesta ? textos.conRespuesta : textos.sinRespuestaCorto}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        );
+      })}
+    </div>
+  );
 
   return (
     <div className="flex flex-1 flex-col">
       <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/95 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95">
-        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <p className="text-sm font-semibold">
+        <div className="mx-auto flex min-h-14 w-full max-w-6xl items-center justify-between gap-3 px-4 py-2 sm:px-6">
+          <p className="min-w-0 truncate text-sm font-semibold">
             Detnov Colombia <span className="font-normal text-zinc-500 dark:text-zinc-400">· {marca?.nombre ?? textos.titulo}</span>
           </p>
-          <nav className="flex items-center gap-1" aria-label="Language">
+          <nav className="flex shrink-0 items-center gap-1" aria-label="Language">
             {IDIOMA_VALUES.map((i) => (
               <Link
                 key={i}
                 href={href(i, pActual)}
                 aria-current={i === idioma ? "true" : undefined}
                 title={IDIOMAS[i].nombre}
-                className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${
+                className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs whitespace-nowrap ${
                   i === idioma
                     ? "border-zinc-900 bg-white font-medium text-zinc-900 dark:border-zinc-50 dark:bg-zinc-800 dark:text-zinc-50"
                     : "border-transparent text-zinc-500 opacity-70 hover:opacity-100 dark:text-zinc-400"
@@ -122,137 +160,118 @@ export default async function ResponderPage({
             ))}
           </nav>
         </div>
-        <details className="group mx-auto w-full max-w-5xl px-4 pb-3 sm:px-6">
-          <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium select-none marker:content-none">
-            <span className="inline-block transition-transform group-open:rotate-90">▸</span>
-            {textos.menu}
-            <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">{abiertas}</span>
-          </summary>
-          <div className="mt-2 flex max-h-80 flex-col gap-3 overflow-y-auto">
-            {PREGUNTA_PRIORIDAD_VALUES.map((prioridad) => {
-              const grupo = menu.filter((x) => x.prioridad === prioridad);
-              if (grupo.length === 0) return null;
-              return (
-                <div key={prioridad}>
-                  <p className="mb-1 flex items-center gap-2 px-1 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-                    <span className={`rounded-full px-2 py-0.5 ${PRIORIDAD_BADGE[prioridad]}`}>
-                      {TEXTOS_PREGUNTA[idioma].prioridad}: {TEXTOS_PREGUNTA[idioma].prioridades[prioridad]}
-                    </span>
-                    <span>{grupo.length}</span>
-                  </p>
-                  <ul className="flex flex-col gap-1">
-                    {grupo.map((x) => {
-                      const actual = x.id === pregunta.id;
-                      return (
-                        <li key={x.id}>
-                          <Link
-                            href={href(idioma, x.id === base.id ? null : x.id)}
-                            aria-current={actual ? "page" : undefined}
-                            className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm ${
-                              actual ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900" : "hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                            }`}
-                          >
-                            <span className="min-w-0 truncate">{tituloDe(x)}</span>
-                            <span className="shrink-0 text-xs opacity-70">{x.respuesta ? textos.conRespuesta : textos.sinRespuestaCorto}</span>
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              );
-            })}
-          </div>
-        </details>
       </header>
 
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-8 sm:px-6">
-        <div>
-          <p className="text-xs font-medium tracking-wide text-zinc-500 uppercase dark:text-zinc-400">{textos.titulo}</p>
-          <h1 className="mt-1 text-2xl font-semibold">{tituloDe(pregunta)}</h1>
-        </div>
-
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">{textos.intro}</p>
-
-        <section className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            {marca && <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">{textos.marca}: {marca.nombre}</span>}
-            <span className="rounded-full bg-sky-100 px-2 py-0.5 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">{textos.estado[pregunta.estado]}</span>
-            <span className={`rounded-full px-2 py-0.5 ${PRIORIDAD_BADGE[pregunta.prioridad]}`}>
-              {TEXTOS_PREGUNTA[idioma].prioridad}: {TEXTOS_PREGUNTA[idioma].prioridades[pregunta.prioridad]}
-            </span>
-            <span className="text-zinc-500 dark:text-zinc-400">
-              {textos.creada} {new Date(pregunta.createdAt).toLocaleDateString(locale, { dateStyle: "medium" })}
-            </span>
-            {vista && <span className="text-sky-700 dark:text-sky-400">🌐 {textos.traduccion}</span>}
+      <div className="mx-auto flex w-full max-w-6xl flex-1 gap-8 px-4 sm:px-6">
+        {/* Barra lateral (pantallas anchas): preguntas abiertas agrupadas por prioridad. */}
+        <aside className="hidden w-72 shrink-0 lg:block">
+          <div className="sticky top-14 max-h-[calc(100vh-3.5rem)] overflow-y-auto py-8 pr-1">
+            <p className="mb-3 flex items-center gap-2 text-sm font-semibold">
+              {textos.menu}
+              <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">{abiertas}</span>
+            </p>
+            {listaPreguntas}
           </div>
+        </aside>
+
+        <main className="flex w-full max-w-3xl min-w-0 flex-1 flex-col gap-6 py-8">
+          {/* En celular la misma lista va desplegable arriba del contenido. */}
+          <details className="group rounded-xl border border-zinc-200 bg-white p-3 lg:hidden dark:border-zinc-800 dark:bg-zinc-900">
+            <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium select-none marker:content-none">
+              <span className="inline-block transition-transform group-open:rotate-90">▸</span>
+              {textos.menu}
+              <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">{abiertas}</span>
+            </summary>
+            <div className="mt-3 max-h-80 overflow-y-auto">{listaPreguntas}</div>
+          </details>
+
           <div>
-            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{textos.pregunta}</p>
-            <TextoEnriquecido texto={contenido} className="mt-1 text-sm text-zinc-800 dark:text-zinc-200" />
+            <p className="text-xs font-medium tracking-wide text-zinc-500 uppercase dark:text-zinc-400">{textos.titulo}</p>
+            <h1 className="mt-1 text-2xl font-semibold">{tituloDe(pregunta)}</h1>
           </div>
-          {productos.length > 0 && (
-            <div>
-              <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{textos.productos}</p>
-              <div className="mt-1 flex flex-wrap gap-1.5">
-                {productos.map((x) => (
-                  <span key={x.id} title={x.nombre} className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                    {x.referencia}
-                  </span>
-                ))}
-              </div>
+
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">{textos.intro}</p>
+
+          <section className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              {marca && <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">{textos.marca}: {marca.nombre}</span>}
+              <span className="rounded-full bg-sky-100 px-2 py-0.5 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">{textos.estado[pregunta.estado]}</span>
+              <span className={`rounded-full px-2 py-0.5 ${PRIORIDAD_BADGE[pregunta.prioridad]}`}>
+                {TEXTOS_PREGUNTA[idioma].prioridad}: {TEXTOS_PREGUNTA[idioma].prioridades[pregunta.prioridad]}
+              </span>
+              <span className="text-zinc-500 dark:text-zinc-400">
+                {textos.creada} {new Date(pregunta.createdAt).toLocaleDateString(locale, { dateStyle: "medium" })}
+              </span>
+              {vista && <span className="text-sky-700 dark:text-sky-400">🌐 {textos.traduccion}</span>}
             </div>
-          )}
-          {vista && (
-            <details className="text-xs text-zinc-500 dark:text-zinc-400">
-              <summary className="cursor-pointer underline">{textos.verOriginal}</summary>
-              <div className="mt-2 flex flex-col gap-2 rounded-lg bg-zinc-50 p-3 whitespace-pre-line dark:bg-zinc-800/60">
-                <p className="font-medium">{pregunta.titulo}</p>
-                <TextoEnriquecido texto={pregunta.contenido} />
-                {mensajes.map((m) => (
-                  <TextoEnriquecido key={m.id} texto={`${m.autor}: ${m.texto}`} />
-                ))}
+            <div>
+              <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{textos.pregunta}</p>
+              <TextoEnriquecido texto={contenido} className="mt-1 text-sm text-zinc-800 dark:text-zinc-200" />
+            </div>
+            {productos.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{textos.productos}</p>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {productos.map((x) => (
+                    <span key={x.id} title={x.nombre} className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                      {x.referencia}
+                    </span>
+                  ))}
+                </div>
               </div>
-            </details>
-          )}
-        </section>
+            )}
+            {vista && (
+              <details className="text-xs text-zinc-500 dark:text-zinc-400">
+                <summary className="cursor-pointer underline">{textos.verOriginal}</summary>
+                <div className="mt-2 flex flex-col gap-2 rounded-lg bg-zinc-50 p-3 whitespace-pre-line dark:bg-zinc-800/60">
+                  <p className="font-medium">{pregunta.titulo}</p>
+                  <TextoEnriquecido texto={pregunta.contenido} />
+                  {mensajes.map((m) => (
+                    <TextoEnriquecido key={m.id} texto={`${m.autor}: ${m.texto}`} />
+                  ))}
+                </div>
+              </details>
+            )}
+          </section>
 
-        <section className="flex flex-col gap-2">
-          <h2 className="text-lg font-semibold">{textos.respuestas}</h2>
-          <HiloMensajes
-            mensajes={mensajes}
-            textos={TEXTOS_PREGUNTA[idioma].hilo}
-            traducido={(m) => textoTraducido(vista, m)}
-            locale={locale}
-          />
-        </section>
+          <section className="flex flex-col gap-2">
+            <h2 className="text-lg font-semibold">{textos.respuestas}</h2>
+            <HiloMensajes
+              mensajes={mensajes}
+              textos={TEXTOS_PREGUNTA[idioma].hilo}
+              traducido={(m) => textoTraducido(vista, m)}
+              locale={locale}
+            />
+          </section>
 
-        <section className="flex flex-col gap-2">
-          <h2 className="text-lg font-semibold">{textos.documentos}</h2>
-          {documentos.length === 0 ? (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">{textos.sinDocumentos}</p>
+          <section className="flex flex-col gap-2">
+            <h2 className="text-lg font-semibold">{textos.documentos}</h2>
+            {documentos.length === 0 ? (
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">{textos.sinDocumentos}</p>
+            ) : (
+              <ul className="flex flex-col gap-1.5">
+                {documentos.map((d) => (
+                  <li key={d.id} className="text-sm">
+                    {d.archivoPath ? (
+                      <a href={`/api/archivos/${d.archivoPath}`} target="_blank" rel="noopener noreferrer" className="underline hover:text-zinc-600 dark:hover:text-zinc-300">
+                        📎 {d.titulo}
+                      </a>
+                    ) : (
+                      <span>📎 {d.titulo}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          {pregunta.estado === "CERRADA" ? (
+            <p className="rounded-xl border border-zinc-200 p-4 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">{textos.cerrada}</p>
           ) : (
-            <ul className="flex flex-col gap-1.5">
-              {documentos.map((d) => (
-                <li key={d.id} className="text-sm">
-                  {d.archivoPath ? (
-                    <a href={`/api/archivos/${d.archivoPath}`} target="_blank" rel="noopener noreferrer" className="underline hover:text-zinc-600 dark:hover:text-zinc-300">
-                      📎 {d.titulo}
-                    </a>
-                  ) : (
-                    <span>📎 {d.titulo}</span>
-                  )}
-                </li>
-              ))}
-            </ul>
+            <FormulariosExterno key={pregunta.id} token={token} preguntaId={pregunta.id} textos={textos} />
           )}
-        </section>
-
-        {pregunta.estado === "CERRADA" ? (
-          <p className="rounded-xl border border-zinc-200 p-4 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">{textos.cerrada}</p>
-        ) : (
-          <FormulariosExterno key={pregunta.id} token={token} preguntaId={pregunta.id} textos={textos} />
-        )}
-      </main>
+        </main>
+      </div>
     </div>
   );
 }
