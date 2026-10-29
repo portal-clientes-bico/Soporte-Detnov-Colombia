@@ -4,7 +4,7 @@ import type { IdiomaVista } from "@/lib/db";
 export const TEXTOS_EXTERNO = {
   es: {
     titulo: "Pregunta de soporte técnico",
-    menu: "Preguntas no resueltas",
+    menu: "Preguntas abiertas",
     conRespuesta: "Con respuesta",
     sinRespuestaCorto: "Sin respuesta",
     intro: "Detnov Colombia le invita a responder esta pregunta. Puede escribir su respuesta en español, inglés o chino y adjuntar documentos.",
@@ -37,10 +37,19 @@ export const TEXTOS_EXTERNO = {
     faltaNombre: "Escriba su nombre antes de enviar.",
     error: "No se pudo completar la acción",
     noValido: "Este enlace no es válido o fue revocado.",
+    sinAbiertas: "No hay preguntas abiertas en este momento. ¡Gracias por su ayuda!",
+    editor: {
+      enlace: "🔗 Insertar enlace",
+      pideUrl: "Dirección del enlace (https://...)",
+      pideTexto: "Texto que se mostrará",
+      urlInvalida: "La dirección debe empezar por http://, https:// o mailto:",
+      vistaPrevia: "Vista previa",
+      ayuda: "Puede pegar texto con enlaces desde una página, Word o un correo; o seleccionar una palabra y pegar encima una URL.",
+    },
   },
   en: {
     titulo: "Technical support question",
-    menu: "Unresolved questions",
+    menu: "Open questions",
     conRespuesta: "Answered",
     sinRespuestaCorto: "No answer",
     intro: "Detnov Colombia invites you to answer this question. You can write your answer in English, Spanish or Chinese and attach documents.",
@@ -73,10 +82,19 @@ export const TEXTOS_EXTERNO = {
     faltaNombre: "Please enter your name before sending.",
     error: "The action could not be completed",
     noValido: "This link is not valid or has been revoked.",
+    sinAbiertas: "There are no open questions at the moment. Thank you for your help!",
+    editor: {
+      enlace: "🔗 Insert link",
+      pideUrl: "Link address (https://...)",
+      pideTexto: "Text to display",
+      urlInvalida: "The address must start with http://, https:// or mailto:",
+      vistaPrevia: "Preview",
+      ayuda: "You can paste text with links from a web page, Word or an email, or select a word and paste a URL over it.",
+    },
   },
   zh: {
     titulo: "技术支持问题",
-    menu: "未解决的问题",
+    menu: "待处理的问题",
     conRespuesta: "已回答",
     sinRespuestaCorto: "未回答",
     intro: "Detnov Colombia 邀请您回答此问题。您可以用中文、英文或西班牙语作答，并上传附件。",
@@ -109,6 +127,15 @@ export const TEXTOS_EXTERNO = {
     faltaNombre: "提交前请填写您的姓名。",
     error: "操作未能完成",
     noValido: "此链接无效或已被撤销。",
+    sinAbiertas: "目前没有待处理的问题。感谢您的帮助！",
+    editor: {
+      enlace: "🔗 插入链接",
+      pideUrl: "链接地址 (https://...)",
+      pideTexto: "显示的文字",
+      urlInvalida: "地址必须以 http://、https:// 或 mailto: 开头",
+      vistaPrevia: "预览",
+      ayuda: "可以从网页、Word 或邮件中粘贴带链接的文字，或选中文字后粘贴网址。",
+    },
   },
 } satisfies Record<IdiomaVista, unknown>;
 

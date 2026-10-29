@@ -78,6 +78,7 @@ Reglas:
 - No traduzcas codigos de modelo o referencias (p. ej. FW2105, JBF-11S), nombres de marcas, nombres de personas, URLs, numeros, unidades ni valores.
 - Si un fragmento ya esta en el idioma destino, dejalo igual. Si el texto mezcla idiomas, entrega todo en el idioma destino.
 - Conserva saltos de linea, listas y numeracion. No agregues notas, explicaciones ni comillas.
+- Los hipervinculos vienen como [texto](url): traduce solo el texto entre corchetes y deja la url exactamente igual. No modifiques las URL sueltas.
 - "mensajes" es el hilo de respuestas y contrapreguntas: traduce el "texto" de cada uno y devuelve el mismo "id", en el mismo orden.`;
 
 export async function traducirPregunta(p: Pregunta, idioma: IdiomaVista): Promise<TraduccionPregunta> {

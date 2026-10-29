@@ -17,6 +17,8 @@ import {
 import { nombreUsuarioActual } from "@/lib/usuario-actual";
 import type { IdiomaVista, MensajePregunta } from "@/lib/db";
 import HiloMensajes from "../../../hilo-mensajes";
+import EditorTexto from "../../../editor-texto";
+import TextoEnriquecido from "../../../texto-enriquecido";
 import { TEXTOS_PREGUNTA } from "@/lib/idioma";
 import EnlaceFabrica from "./enlace-fabrica";
 
@@ -357,7 +359,7 @@ function CamposPregunta({
       </div>
       <div>
         <label className="block text-sm text-zinc-600 dark:text-zinc-400">Pregunta</label>
-        <textarea value={valores.contenido} onChange={(e) => onChange("contenido", e.target.value)} required rows={3} className={inputClass} />
+        <EditorTexto value={valores.contenido} onChange={(v) => onChange("contenido", v)} required rows={3} className={inputClass} />
       </div>
     </div>
   );
@@ -547,9 +549,9 @@ function HiloPanel({ pregunta, vista, textos, locale }: { pregunta: Pregunta; vi
               <input type="radio" checked={tipo === "CONTRAPREGUNTA"} onChange={() => setTipo("CONTRAPREGUNTA")} /> Contrapregunta
             </label>
           </div>
-          <textarea
+          <EditorTexto
             value={texto}
-            onChange={(e) => setTexto(e.target.value)}
+            onChange={setTexto}
             placeholder={tipo === "RESPUESTA" ? "Escribe la respuesta..." : "Escribe la contrapregunta o la información que hace falta..."}
             rows={2}
             className={inputClass}
@@ -877,7 +879,7 @@ function PreguntaCard({
           </div>
         </div>
 
-        <p className="text-sm whitespace-pre-line text-zinc-700 dark:text-zinc-300">{vista?.contenido ?? pregunta.contenido}</p>
+        <TextoEnriquecido texto={vista?.contenido ?? pregunta.contenido} className="text-sm text-zinc-700 dark:text-zinc-300" />
 
         <HiloPanel pregunta={pregunta} vista={vista} textos={textos} locale={idioma === "zh" ? "zh-CN" : idioma === "en" ? "en-US" : "es-CO"} />
 

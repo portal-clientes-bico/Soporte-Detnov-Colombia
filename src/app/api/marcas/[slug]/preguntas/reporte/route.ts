@@ -3,6 +3,7 @@ import { Document, HeadingLevel, Packer, Paragraph, TextRun } from "docx";
 import { getMarcaPorSlug, getPreguntasDeMarca } from "@/lib/queries";
 import { DOCUMENTO_TIPOS, ORGANIZACIONES, PREGUNTA_ESTADOS, PREGUNTA_ESTADO_VALUES, PREGUNTA_PRIORIDADES, PREGUNTA_PRIORIDAD_VALUES, slugify } from "@/lib/tipos";
 import type { SoportePreguntaEstado, SoportePreguntaPrioridad } from "@/lib/db";
+import { aTextoPlano } from "@/lib/texto-enriquecido";
 
 type Pregunta = Awaited<ReturnType<typeof getPreguntasDeMarca>>[number];
 
@@ -30,7 +31,7 @@ function bloquePregunta(p: Pregunta): Paragraph[] {
     new Paragraph({ spacing: { after: 120 }, children: [new TextRun({ text: metadata, italics: true, size: 18, color: "666666" })] }),
     new Paragraph({
       spacing: { after: 120 },
-      children: [new TextRun({ text: "Pregunta: ", bold: true }), new TextRun(p.contenido)],
+      children: [new TextRun({ text: "Pregunta: ", bold: true }), new TextRun(aTextoPlano(p.contenido))],
     }),
   ];
 
@@ -43,7 +44,7 @@ function bloquePregunta(p: Pregunta): Paragraph[] {
         new Paragraph({
           spacing: { after: 80 },
           indent: { left: 360 },
-          children: [new TextRun({ text: encabezado, bold: true, size: 20 }), new TextRun(m.texto)],
+          children: [new TextRun({ text: encabezado, bold: true, size: 20 }), new TextRun(aTextoPlano(m.texto))],
         }),
       );
     }

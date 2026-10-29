@@ -1,4 +1,5 @@
 import type { MensajePregunta } from "@/lib/db";
+import TextoEnriquecido from "./texto-enriquecido";
 
 export interface TextosHilo {
   respuesta: string;
@@ -59,7 +60,7 @@ export default function HiloMensajes({
                 </button>
               )}
             </div>
-            <p className="mt-1 whitespace-pre-line text-zinc-700 dark:text-zinc-300">{traducido?.(m) ?? m.texto}</p>
+            <TextoEnriquecido texto={traducido?.(m) ?? m.texto} className="mt-1 text-zinc-700 dark:text-zinc-300" />
           </li>
         );
       })}

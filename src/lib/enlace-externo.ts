@@ -17,22 +17,24 @@ export function preguntaPorToken(db: Db, token: string): Pregunta | null {
 }
 
 /**
- * Preguntas no resueltas (ABIERTA) de la misma marca que la pregunta del enlace: quien entra
- * con el enlace puede consultarlas y responderlas desde el menu superior. Los borradores
- * (internos) y las cerradas no se muestran, salvo la propia pregunta del enlace.
+ * Preguntas que se ven con el enlace: solo las ABIERTA de la misma marca que la pregunta del
+ * enlace (ni borradores, que son internos, ni cerradas; tampoco la propia pregunta del enlace
+ * si ya se cerro). La del enlace va primero.
  */
 export function preguntasDelEnlace(db: Db, base: Pregunta): Pregunta[] {
   return db.preguntas
-    .filter((p) => p.marcaId === base.marcaId && (p.id === base.id || p.estado === "ABIERTA"))
+    .filter((p) => p.marcaId === base.marcaId && p.estado === "ABIERTA")
     .sort((a, b) => (a.id === base.id ? -1 : b.id === base.id ? 1 : b.createdAt.localeCompare(a.createdAt)));
 }
 
-/** Pregunta que se consulta o responde con el enlace: la del token o, si se indica otra, una
- * de las que permite el menu (misma marca y no resuelta). null si no esta permitida. */
+/**
+ * Pregunta abierta que se consulta o responde con el enlace: la indicada (si esta entre las
+ * del menu) o, sin indicar, la del enlace. null si el token no existe o la pregunta no esta
+ * abierta / no pertenece a la marca del enlace.
+ */
 export function resolverPreguntaExterna(db: Db, token: string, preguntaId?: string | null): { base: Pregunta; pregunta: Pregunta } | null {
   const base = preguntaPorToken(db, token);
   if (!base) return null;
-  if (!preguntaId || preguntaId === base.id) return { base, pregunta: base };
-  const pregunta = preguntasDelEnlace(db, base).find((p) => p.id === preguntaId);
+  const pregunta = preguntasDelEnlace(db, base).find((p) => p.id === (preguntaId || base.id));
   return pregunta ? { base, pregunta } : null;
 }

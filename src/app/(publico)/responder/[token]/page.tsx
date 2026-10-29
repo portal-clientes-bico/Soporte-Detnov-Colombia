@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { leerDb, type Documento, type IdiomaVista, type Producto } from "@/lib/db";
-import { preguntasDelEnlace, resolverPreguntaExterna } from "@/lib/enlace-externo";
+import { preguntaPorToken, preguntasDelEnlace } from "@/lib/enlace-externo";
 import { IDIOMAS, IDIOMA_VALUES, TEXTOS_PREGUNTA, normalizarIdioma } from "@/lib/idioma";
 import { mensajesDe, textoTraducido } from "@/lib/hilo";
 import { PREGUNTA_PRIORIDAD_VALUES } from "@/lib/tipos";
 import HiloMensajes from "../../../hilo-mensajes";
+import TextoEnriquecido from "../../../texto-enriquecido";
 import { asegurarTraducciones } from "@/lib/traduccion-preguntas";
 import BanderaIdioma from "../../../bandera-idioma";
 import FormulariosExterno from "./formularios";
@@ -51,22 +52,25 @@ export default async function ResponderPage({
   const textos = TEXTOS_EXTERNO[idioma];
 
   const db = await leerDb();
-  const resuelto = resolverPreguntaExterna(db, token, p) ?? resolverPreguntaExterna(db, token);
-  if (!resuelto) {
+  const base = preguntaPorToken(db, token);
+  // Solo se ven preguntas abiertas: la pedida (?p=), la del enlace o, si esa ya se cerro, la
+  // primera abierta de la marca.
+  const menu = base ? preguntasDelEnlace(db, base) : [];
+  const pregunta = menu.find((x) => x.id === p) ?? menu.find((x) => x.id === base?.id) ?? menu[0] ?? null;
+  if (!base || !pregunta) {
+    const clave = base ? "sinAbiertas" : "noValido";
     return (
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-16 text-center sm:px-6">
         <p className="text-zinc-600 dark:text-zinc-400">
-          {TEXTOS_EXTERNO.en.noValido}
+          {TEXTOS_EXTERNO.en[clave]}
           <br />
-          {TEXTOS_EXTERNO.es.noValido}
+          {TEXTOS_EXTERNO.es[clave]}
           <br />
-          {TEXTOS_EXTERNO.zh.noValido}
+          {TEXTOS_EXTERNO.zh[clave]}
         </p>
       </main>
     );
   }
-  const { base, pregunta } = resuelto;
-  const menu = preguntasDelEnlace(db, base);
 
   // Traduccion al idioma de la pagina de la pregunta abierta y de los titulos del menu (se
   // guardan: las siguientes visitas no las vuelven a pagar).
@@ -184,7 +188,7 @@ export default async function ResponderPage({
           </div>
           <div>
             <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{textos.pregunta}</p>
-            <p className="mt-1 text-sm whitespace-pre-line text-zinc-800 dark:text-zinc-200">{contenido}</p>
+            <TextoEnriquecido texto={contenido} className="mt-1 text-sm text-zinc-800 dark:text-zinc-200" />
           </div>
           {productos.length > 0 && (
             <div>
@@ -203,11 +207,9 @@ export default async function ResponderPage({
               <summary className="cursor-pointer underline">{textos.verOriginal}</summary>
               <div className="mt-2 flex flex-col gap-2 rounded-lg bg-zinc-50 p-3 whitespace-pre-line dark:bg-zinc-800/60">
                 <p className="font-medium">{pregunta.titulo}</p>
-                <p>{pregunta.contenido}</p>
+                <TextoEnriquecido texto={pregunta.contenido} />
                 {mensajes.map((m) => (
-                  <p key={m.id}>
-                    {m.autor}: {m.texto}
-                  </p>
+                  <TextoEnriquecido key={m.id} texto={`${m.autor}: ${m.texto}`} />
                 ))}
               </div>
             </details>

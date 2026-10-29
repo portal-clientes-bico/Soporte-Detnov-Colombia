@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ARCHIVO_MAX_BYTES } from "@/lib/tipos";
 import type { TextosExterno } from "./textos";
+import EditorTexto from "../../../editor-texto";
 
 const inputClass =
   "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50";
@@ -101,7 +102,7 @@ export default function FormulariosExterno({ token, preguntaId, textos }: { toke
             <input type="radio" checked={tipo === "CONTRAPREGUNTA"} onChange={() => setTipo("CONTRAPREGUNTA")} /> {textos.tipoContrapregunta}
           </label>
         </div>
-        <textarea value={respuesta} onChange={(e) => setRespuesta(e.target.value)} required minLength={2} rows={6} placeholder={textos.respuesta} className={inputClass} />
+        <EditorTexto value={respuesta} onChange={setRespuesta} required rows={6} placeholder={textos.respuesta} className={inputClass} textos={textos.editor} />
         <button type="submit" disabled={enviando !== null} className={botonClass}>
           {enviando === "respuesta" ? textos.enviando : textos.enviar}
         </button>
