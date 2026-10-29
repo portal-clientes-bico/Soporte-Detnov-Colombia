@@ -13,7 +13,11 @@ type PaginaCtx = NonNullable<DocumentoCtx["paginas"]>[number];
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
-const MAX_TOKENS = 1500;
+// Los modelos actuales razonan (adaptive thinking) por defecto y ese razonamiento cuenta dentro de
+// max_tokens, asi que el tope debe dejar espacio para pensar y para la respuesta completa.
+const MAX_TOKENS = 16000;
+// Esfuerzo bajo: respuestas de soporte directas, con menos razonamiento (menos costo y latencia).
+const EFFORT = process.env.ANTHROPIC_EFFORT || "low";
 
 export class ChatbotConfigError extends Error {}
 export class ChatbotApiError extends Error {}
@@ -531,6 +535,7 @@ export async function preguntarChatbot(pregunta: string, marcaNombre: string, co
     body: JSON.stringify({
       model: MODEL,
       max_tokens: MAX_TOKENS,
+      output_config: { effort: EFFORT },
       system: [
         { type: "text", text: bloqueEstatico, cache_control: { type: "ephemeral" } },
         { type: "text", text: bloqueDinamico },
@@ -545,8 +550,17 @@ export async function preguntarChatbot(pregunta: string, marcaNombre: string, co
   }
 
   const data = await res.json();
-  const texto = Array.isArray(data.content) ? data.content.map((b: { type: string; text?: string }) => (b.type === "text" ? b.text : "")).join("") : "";
-  if (!texto) throw new ChatbotApiError("La API de Claude no devolvio texto en la respuesta.");
+  let texto = Array.isArray(data.content) ? data.content.map((b: { type: string; text?: string }) => (b.type === "text" ? b.text : "")).join("") : "";
+  if (!texto) {
+    const motivo =
+      data.stop_reason === "max_tokens"
+        ? "Se agoto el limite de tokens antes de redactar la respuesta; intenta una pregunta mas concreta."
+        : data.stop_reason === "refusal"
+          ? "El modelo declino responder esta pregunta."
+          : `Motivo: ${data.stop_reason ?? "desconocido"}.`;
+    throw new ChatbotApiError(`La API de Claude no devolvio texto en la respuesta. ${motivo}`);
+  }
+  if (data.stop_reason === "max_tokens") texto += "\n\n_(Respuesta recortada por limite de longitud.)_";
 
   const uso = {
     inputTokens: typeof data.usage?.input_tokens === "number" ? data.usage.input_tokens : 0,
