@@ -228,10 +228,13 @@ export const tareaPatchSchema = tareaCamposSchema.partial().extend({
   estado: z.enum(TAREA_ESTADO_VALUES).optional(),
 });
 
+const idiomaOpcional = z.enum(["es", "en", "zh"]).optional();
+
 export const usuarioSchema = z.object({
   nombre: z.string().trim().min(1).max(120),
   email: emailOpcional,
   organizacion: organizacionOpcional,
+  idioma: idiomaOpcional,
 });
 
 export const usuarioPatchSchema = usuarioSchema.partial();
@@ -249,6 +252,7 @@ export const usuarioConPasswordSchema = z.object({
   email: emailRequerido,
   password: z.string().min(4).max(200),
   organizacion: organizacionOpcional,
+  idioma: idiomaOpcional,
 });
 
 /** Establecer o cambiar la contrasena de un usuario existente (accion separada del PATCH normal). */

@@ -290,6 +290,9 @@ export interface Usuario {
   /** "salt:hash" (scrypt). Nunca se envia al cliente; ver queries.ts (getUsuarios lo omite). */
   passwordHash: string | null;
   organizacion: SoporteOrganizacion | null;
+  /** Idioma en que la persona ve por defecto el contenido (preguntas internas). Sin definir =
+   * español. Puede cambiarlo momentaneamente con las banderas del encabezado. */
+  idioma?: IdiomaVista;
   createdAt: string;
   updatedAt: string;
 }

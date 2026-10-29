@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import type { getUsuarios } from "@/lib/queries";
 import { ORGANIZACIONES, ORGANIZACION_VALUES } from "@/lib/tipos";
 import { guardarUsuarioActual, leerUsuarioActual } from "@/lib/usuario-actual";
+import { COOKIE_IDIOMA, IDIOMAS, IDIOMA_VALUES, normalizarIdioma } from "@/lib/idioma";
+import BanderaIdioma from "../../bandera-idioma";
 
 type Usuario = Awaited<ReturnType<typeof getUsuarios>>[number];
 
@@ -12,14 +14,14 @@ const inputClass =
   "w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50";
 
 function valoresIniciales() {
-  return { nombre: "", email: "", password: "", organizacion: "" };
+  return { nombre: "", email: "", password: "", organizacion: "", idioma: "es" };
 }
 
 function UsuarioCampos({
   valores,
   onChange,
 }: {
-  valores: { nombre: string; email: string; organizacion: string };
+  valores: { nombre: string; email: string; organizacion: string; idioma: string };
   onChange: (campo: string, valor: string) => void;
 }) {
   return (
@@ -39,6 +41,16 @@ function UsuarioCampos({
           {ORGANIZACION_VALUES.map((o) => (
             <option key={o} value={o}>
               {ORGANIZACIONES[o]}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className="block text-sm text-zinc-600 dark:text-zinc-400">Idioma por defecto</label>
+        <select value={valores.idioma} onChange={(e) => onChange("idioma", e.target.value)} className={inputClass}>
+          {IDIOMA_VALUES.map((i) => (
+            <option key={i} value={i}>
+              {IDIOMAS[i].nombre}
             </option>
           ))}
         </select>
@@ -113,6 +125,16 @@ function NuevoUsuarioForm() {
             {ORGANIZACION_VALUES.map((o) => (
               <option key={o} value={o}>
                 {ORGANIZACIONES[o]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm text-zinc-600 dark:text-zinc-400">Idioma por defecto</label>
+          <select value={valores.idioma} onChange={(e) => setValores((p) => ({ ...p, idioma: e.target.value }))} className={inputClass}>
+            {IDIOMA_VALUES.map((i) => (
+              <option key={i} value={i}>
+                {IDIOMAS[i].nombre}
               </option>
             ))}
           </select>
@@ -206,7 +228,7 @@ function PasswordPanel({ usuarioId, tienePassword }: { usuarioId: string; tieneP
 }
 
 function valoresDesdeUsuario(usuario: Usuario) {
-  return { nombre: usuario.nombre, email: usuario.email ?? "", organizacion: usuario.organizacion ?? "" };
+  return { nombre: usuario.nombre, email: usuario.email ?? "", organizacion: usuario.organizacion ?? "", idioma: normalizarIdioma(usuario.idioma) as string };
 }
 
 function UsuarioCard({ usuario }: { usuario: Usuario }) {
@@ -245,7 +267,12 @@ function UsuarioCard({ usuario }: { usuario: Usuario }) {
       setError(data.error ?? "No se pudo guardar");
       return;
     }
-    if (esActual) guardarUsuarioActual({ id: usuario.id, nombre: valores.nombre });
+    if (esActual) {
+      guardarUsuarioActual({ id: usuario.id, nombre: valores.nombre });
+      // Si cambio su propio idioma por defecto, se descarta la eleccion momentanea de las
+      // banderas para que vea de inmediato el contenido en el idioma nuevo.
+      if (valores.idioma !== normalizarIdioma(usuario.idioma)) document.cookie = `${COOKIE_IDIOMA}=; path=/; max-age=0`;
+    }
     setEditando(false);
     router.refresh();
   }
@@ -288,6 +315,10 @@ function UsuarioCard({ usuario }: { usuario: Usuario }) {
           {usuario.organizacion && (
             <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">{ORGANIZACIONES[usuario.organizacion]}</span>
           )}
+          <span className="flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300" title="Idioma por defecto">
+            <BanderaIdioma idioma={normalizarIdioma(usuario.idioma)} className="h-2.5 w-[15px] rounded-[1px]" />
+            {IDIOMAS[normalizarIdioma(usuario.idioma)].nombre}
+          </span>
         </div>
         {usuario.email && <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{usuario.email}</p>}
         <PasswordPanel usuarioId={usuario.id} tienePassword={usuario.tienePassword} />

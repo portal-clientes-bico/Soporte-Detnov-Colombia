@@ -1,8 +1,21 @@
 import type { IdiomaVista, SoportePreguntaEstado, SoportePreguntaPrioridad } from "@/lib/db";
 
-/** Cookie con el idioma elegido en el icono de idioma del encabezado (no es secreta: la lee
- * el servidor para saber en que idioma mostrar las preguntas y la escribe el navegador). */
+/** Cookie con el idioma elegido momentaneamente en las banderas del encabezado (no es secreta:
+ * la lee el servidor y la escribe el navegador). Guarda "<usuarioId>:<idioma>" para que, si
+ * otra persona inicia sesion en el mismo navegador, vea su propio idioma por defecto. */
 export const COOKIE_IDIOMA = "idioma-vista";
+
+export function valorCookieIdioma(usuarioId: string, idioma: IdiomaVista): string {
+  return `${usuarioId}:${idioma}`;
+}
+
+/** Idioma en que se le muestra el contenido a la persona: el que eligio en las banderas (si la
+ * cookie es suya) o, si no, su idioma por defecto (Usuarios), o español. */
+export function idiomaEfectivo(cookie: string | undefined, usuarioId: string, idiomaPorDefecto: IdiomaVista | undefined | null): IdiomaVista {
+  const [dueno, idioma] = (cookie ?? "").split(":");
+  if (dueno === usuarioId && (IDIOMA_VALUES as string[]).includes(idioma)) return idioma as IdiomaVista;
+  return normalizarIdioma(idiomaPorDefecto);
+}
 
 export const IDIOMA_VALUES: IdiomaVista[] = ["es", "en", "zh"];
 

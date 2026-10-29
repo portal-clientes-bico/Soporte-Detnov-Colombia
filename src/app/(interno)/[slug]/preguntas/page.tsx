@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { getDocumentosDeMarca, getMarcaPorSlug, getPreguntasDeMarca, getReferenciasDeMarca, getUsuarios } from "@/lib/queries";
-import { COOKIE_IDIOMA, normalizarIdioma } from "@/lib/idioma";
+import { idiomaDeLaPeticion } from "@/lib/idioma-servidor";
 import { requiereTraduccion, traduccionVigente } from "@/lib/traduccion-preguntas";
 import { PREGUNTA_ESTADO_VALUES, PREGUNTA_ESTADOS, PREGUNTA_PRIORIDAD_VALUES, PREGUNTA_PRIORIDADES } from "@/lib/tipos";
 import type { SoportePreguntaEstado, SoportePreguntaPrioridad } from "@/lib/db";
@@ -30,7 +29,7 @@ export default async function PreguntasPage({
     getDocumentosDeMarca(marca.id),
   ]);
 
-  const idioma = normalizarIdioma((await cookies()).get(COOKIE_IDIOMA)?.value);
+  const { idioma } = await idiomaDeLaPeticion();
   // "vista": la traduccion vigente al idioma elegido (o null = se muestra el original). Las
   // traducciones guardadas de otros idiomas no viajan al navegador.
   const preguntasFiltradas = (sp.referencia ? preguntas.filter((p) => p.productos.some((r) => r.referencia === sp.referencia)) : preguntas).map(
