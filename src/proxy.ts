@@ -5,6 +5,7 @@ import { COOKIE_SESION, verificarTokenSesion } from "@/lib/sesion";
  * Control de acceso de la herramienta interna. Todo exige sesion (cookie firmada, ver
  * src/lib/sesion.ts) salvo:
  * - /ayuda/**: sitio publico de instructivos para clientes.
+ * - /responder/<token> y /api/externo/<token>/**: enlace de una pregunta para la fabrica.
  * - GET /api/archivos/**: por ahi se sirven las imagenes de los instructivos publicados.
  * - /login, /api/usuarios/login y /api/usuarios/logout.
  * - POST /api/usuarios: el propio handler solo lo permite sin sesion para crear la primera
@@ -16,6 +17,9 @@ function esPublica(request: NextRequest): boolean {
   const metodo = request.method;
 
   if (pathname === "/ayuda" || pathname.startsWith("/ayuda/")) return true;
+  // Enlace externo de una pregunta para la fabrica: el token del enlace es la autorizacion
+  // (lo valida cada pagina/handler; ver src/lib/enlace-externo.ts).
+  if (pathname.startsWith("/responder/") || pathname.startsWith("/api/externo/")) return true;
   if (pathname === "/login") return true;
   if (pathname === "/api/usuarios/login" || pathname === "/api/usuarios/logout") return true;
   if (pathname === "/api/usuarios" && metodo === "POST") return true;

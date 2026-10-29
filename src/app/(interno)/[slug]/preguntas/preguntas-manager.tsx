@@ -17,6 +17,7 @@ import {
 import { nombreUsuarioActual } from "@/lib/usuario-actual";
 import type { IdiomaVista } from "@/lib/db";
 import { TEXTOS_PREGUNTA } from "@/lib/idioma";
+import EnlaceFabrica from "./enlace-fabrica";
 
 /** Textos de la pregunta traducidos al idioma de vista (null = se muestra el original). */
 type VistaPregunta = { titulo: string; contenido: string; respuesta: string | null };
@@ -897,6 +898,8 @@ function PreguntaCard({
         </div>
 
         <ArchivosPanel pregunta={pregunta} documentosDisponibles={documentosDisponibles} />
+
+        <EnlaceFabrica preguntaId={pregunta.id} titulo={pregunta.titulo} enlace={pregunta.enlaceExterno} />
 
         {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
       </div>

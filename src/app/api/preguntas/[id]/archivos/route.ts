@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { mutarDb, nuevoId, ahora, leerDb } from "@/lib/db";
 import { preguntaArchivoCamposSchema } from "@/lib/schemas";
-import { guardarArchivo, ArchivoValidationError } from "@/lib/storage";
-import { extraerYGuardarSiCorresponde } from "@/lib/extraccion-texto";
+import { ArchivoValidationError } from "@/lib/storage";
+import { adjuntarArchivoAPregunta, PreguntaNoEncontradaError } from "@/lib/preguntas-archivos";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -22,69 +21,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Selecciona un archivo" }, { status: 400 });
   }
 
-  const db0 = await leerDb();
-  const pregunta = db0.preguntas.find((p) => p.id === id);
-  if (!pregunta) return NextResponse.json({ error: "Pregunta no encontrada" }, { status: 404 });
-  const marca = db0.marcas.find((m) => m.id === pregunta.marcaId);
-  if (!marca) return NextResponse.json({ error: "Marca no encontrada" }, { status: 404 });
-
-  let guardado: { nombreArchivo: string; archivoPath: string };
   try {
-    guardado = await guardarArchivo(marca.slug, archivo);
+    const documentoId = await adjuntarArchivoAPregunta(id, archivo, { ...parsed.data, confianza: "CONFIRMADO" });
+    return NextResponse.json({ ok: true, documentoId });
   } catch (error) {
-    if (error instanceof ArchivoValidationError) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
+    if (error instanceof PreguntaNoEncontradaError) return NextResponse.json({ error: error.message }, { status: 404 });
+    if (error instanceof ArchivoValidationError) return NextResponse.json({ error: error.message }, { status: 400 });
     console.error("Error subiendo archivo de pregunta:", error);
     return NextResponse.json({ error: "No se pudo subir el archivo. Intenta de nuevo." }, { status: 500 });
   }
-
-  const documentoId = await mutarDb((db) => {
-    const now = ahora();
-    const nuevoDocId = nuevoId();
-    db.documentos.push({
-      id: nuevoDocId,
-      marcaId: pregunta.marcaId,
-      fuenteId: null,
-      tipo: parsed.data.tipo,
-      titulo: parsed.data.titulo,
-      codigo: null,
-      revision: null,
-      fechaEmision: null,
-      idioma: "ES",
-      urlOrigen: null,
-      archivoNombre: guardado.nombreArchivo,
-      archivoPath: guardado.archivoPath,
-      confianza: "CONFIRMADO",
-      notas: parsed.data.notas ?? `Adjuntado desde la pregunta: ${pregunta.titulo}`,
-      textoExtraidoEn: null,
-      embeddingsGeneradasEn: null,
-      traduccionDeId: null,
-      estadoTraduccion: null,
-      createdAt: now,
-      updatedAt: now,
-    });
-    db.preguntaDocumentos.push({ preguntaId: id, documentoId: nuevoDocId });
-    // El archivo tambien queda vinculado a los mismos productos de la pregunta,
-    // para que aparezca en la ficha de cada referencia relacionada.
-    const productoIds = db.preguntaProductos.filter((pp) => pp.preguntaId === id).map((pp) => pp.productoId);
-    for (const productoId of productoIds) {
-      db.documentoProductos.push({ documentoId: nuevoDocId, productoId });
-    }
-    return nuevoDocId;
-  });
-
-  // Extraccion de texto + embeddings para el ChatBot: intento aparte, nunca hace fallar la subida.
-  const resultado = await extraerYGuardarSiCorresponde({ id: documentoId, confianza: "CONFIRMADO", archivoPath: guardado.archivoPath });
-  if (resultado.textoExtraidoEn) {
-    await mutarDb((db) => {
-      const doc = db.documentos.find((d) => d.id === documentoId);
-      if (doc) {
-        doc.textoExtraidoEn = resultado.textoExtraidoEn;
-        doc.embeddingsGeneradasEn = resultado.embeddingsGeneradasEn;
-      }
-    });
-  }
-
-  return NextResponse.json({ ok: true, documentoId });
 }

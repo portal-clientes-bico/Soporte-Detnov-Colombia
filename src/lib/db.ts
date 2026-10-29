@@ -199,12 +199,22 @@ export interface Pregunta {
    * original traducido, asi que si el titulo/contenido/respuesta cambian queda desactualizada
    * y se regenera. Ver src/lib/traduccion-preguntas.ts. */
   traducciones?: Partial<Record<IdiomaVista, TraduccionPregunta>>;
+  /** Enlace para que funcionarios de la fabrica respondan sin usuario ni contrasena
+   * (/responder/<token>). Quien tenga el enlace puede ver la pregunta, responder y adjuntar
+   * archivos; se revoca borrandolo. Ver src/lib/enlace-externo.ts. */
+  enlaceExterno?: EnlaceExterno | null;
   createdAt: string;
   updatedAt: string;
 }
 
 /** Idiomas en los que se pueden ver las preguntas internas (icono de idioma del encabezado). */
 export type IdiomaVista = "es" | "en" | "zh";
+
+export interface EnlaceExterno {
+  token: string;
+  creadoEn: string;
+  creadoPor: string | null;
+}
 
 export interface TraduccionPregunta {
   titulo: string;
