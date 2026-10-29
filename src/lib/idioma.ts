@@ -53,6 +53,8 @@ export const TEXTOS_PREGUNTA: Record<
     traduciendo: string;
     traducirAlEspanol: string;
     errorTraduccion: string;
+    hiloTitulo: string;
+    hilo: { respuesta: string; contrapregunta: string; equipo: string; fabrica: string; sinMensajes: string };
   }
 > = {
   es: {
@@ -69,6 +71,8 @@ export const TEXTOS_PREGUNTA: Record<
     traduciendo: "Traduciendo preguntas...",
     traducirAlEspanol: "Traducir al español",
     errorTraduccion: "No se pudieron traducir algunas preguntas",
+    hiloTitulo: "Respuestas y contrapreguntas",
+    hilo: { respuesta: "Respuesta", contrapregunta: "Contrapregunta", equipo: "Equipo", fabrica: "Fábrica", sinMensajes: "Aún no hay respuestas." },
   },
   en: {
     prioridad: "Priority",
@@ -84,6 +88,8 @@ export const TEXTOS_PREGUNTA: Record<
     traduciendo: "Translating questions...",
     traducirAlEspanol: "Translate to Spanish",
     errorTraduccion: "Some questions could not be translated",
+    hiloTitulo: "Answers and follow-up questions",
+    hilo: { respuesta: "Answer", contrapregunta: "Follow-up question", equipo: "Team", fabrica: "Factory", sinMensajes: "No answers yet." },
   },
   zh: {
     prioridad: "优先级",
@@ -99,5 +105,7 @@ export const TEXTOS_PREGUNTA: Record<
     traduciendo: "正在翻译问题...",
     traducirAlEspanol: "翻译成西班牙语",
     errorTraduccion: "部分问题无法翻译",
+    hiloTitulo: "回答与追问",
+    hilo: { respuesta: "回答", contrapregunta: "追问", equipo: "团队", fabrica: "工厂", sinMensajes: "暂无回答。" },
   },
 };

@@ -2,6 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { mutarDb, type IdiomaVista, type Pregunta, type TraduccionPregunta } from "@/lib/db";
 import { contieneCJK } from "@/lib/idioma";
+import { mensajesDe } from "@/lib/hilo";
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
@@ -18,7 +19,8 @@ const NOMBRE_IDIOMA: Record<IdiomaVista, string> = {
 export class TraduccionError extends Error {}
 
 /** Identifica el texto original que se tradujo: si cambia, la traduccion guardada queda
- * desactualizada. */
+ * desactualizada. "respuesta" es el resumen del hilo (ver hilo.ts), asi que cualquier mensaje
+ * nuevo o borrado tambien la invalida. */
 export function huellaPregunta(p: Pick<Pregunta, "titulo" | "contenido" | "respuesta">): string {
   return createHash("sha1").update(JSON.stringify([p.titulo, p.contenido, p.respuesta ?? ""])).digest("hex");
 }
@@ -33,7 +35,7 @@ export function traduccionVigente(p: Pregunta, idioma: IdiomaVista): TraduccionP
  * respuestas en ingles el usuario puede pedirlo a mano ("Traducir al español"). */
 export function requiereTraduccion(p: Pregunta, idioma: IdiomaVista): boolean {
   if (idioma !== "es") return true;
-  return contieneCJK(p.titulo) || contieneCJK(p.contenido) || contieneCJK(p.respuesta);
+  return contieneCJK(p.titulo) || contieneCJK(p.contenido) || mensajesDe(p).some((m) => contieneCJK(m.texto));
 }
 
 /**
@@ -76,9 +78,10 @@ Reglas:
 - No traduzcas codigos de modelo o referencias (p. ej. FW2105, JBF-11S), nombres de marcas, nombres de personas, URLs, numeros, unidades ni valores.
 - Si un fragmento ya esta en el idioma destino, dejalo igual. Si el texto mezcla idiomas, entrega todo en el idioma destino.
 - Conserva saltos de linea, listas y numeracion. No agregues notas, explicaciones ni comillas.
-- Si la respuesta viene vacia, devuelve "respuesta" como cadena vacia.`;
+- "mensajes" es el hilo de respuestas y contrapreguntas: traduce el "texto" de cada uno y devuelve el mismo "id", en el mismo orden.`;
 
 export async function traducirPregunta(p: Pregunta, idioma: IdiomaVista): Promise<TraduccionPregunta> {
+  const mensajes = mensajesDe(p).map((m) => ({ id: m.id, texto: m.texto }));
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new TraduccionError("Falta configurar ANTHROPIC_API_KEY.");
 
@@ -92,7 +95,7 @@ export async function traducirPregunta(p: Pregunta, idioma: IdiomaVista): Promis
       messages: [
         {
           role: "user",
-          content: `Idioma destino: ${NOMBRE_IDIOMA[idioma]}\n\n${JSON.stringify({ titulo: p.titulo, contenido: p.contenido, respuesta: p.respuesta ?? "" }, null, 2)}`,
+          content: `Idioma destino: ${NOMBRE_IDIOMA[idioma]}\n\n${JSON.stringify({ titulo: p.titulo, contenido: p.contenido, mensajes }, null, 2)}`,
         },
       ],
       output_config: {
@@ -101,8 +104,20 @@ export async function traducirPregunta(p: Pregunta, idioma: IdiomaVista): Promis
           type: "json_schema",
           schema: {
             type: "object",
-            properties: { titulo: { type: "string" }, contenido: { type: "string" }, respuesta: { type: "string" } },
-            required: ["titulo", "contenido", "respuesta"],
+            properties: {
+              titulo: { type: "string" },
+              contenido: { type: "string" },
+              mensajes: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: { id: { type: "string" }, texto: { type: "string" } },
+                  required: ["id", "texto"],
+                  additionalProperties: false,
+                },
+              },
+            },
+            required: ["titulo", "contenido", "mensajes"],
             additionalProperties: false,
           },
         },
@@ -119,7 +134,7 @@ export async function traducirPregunta(p: Pregunta, idioma: IdiomaVista): Promis
     throw new TraduccionError(`La traduccion no se completo (${data.stop_reason}).`);
   }
   const texto = Array.isArray(data.content) ? data.content.map((b: { type: string; text?: string }) => (b.type === "text" ? b.text : "")).join("") : "";
-  let json: { titulo?: unknown; contenido?: unknown; respuesta?: unknown };
+  let json: { titulo?: unknown; contenido?: unknown; mensajes?: unknown };
   try {
     json = JSON.parse(texto);
   } catch {
@@ -128,10 +143,17 @@ export async function traducirPregunta(p: Pregunta, idioma: IdiomaVista): Promis
   if (typeof json.titulo !== "string" || typeof json.contenido !== "string") {
     throw new TraduccionError("La API de Claude no devolvio una traduccion valida.");
   }
+  const traducidos: Record<string, string> = {};
+  if (Array.isArray(json.mensajes)) {
+    for (const m of json.mensajes as { id?: unknown; texto?: unknown }[]) {
+      if (typeof m?.id === "string" && typeof m.texto === "string" && mensajes.some((x) => x.id === m.id)) traducidos[m.id] = m.texto;
+    }
+  }
   return {
     titulo: json.titulo,
     contenido: json.contenido,
-    respuesta: p.respuesta && typeof json.respuesta === "string" && json.respuesta ? json.respuesta : null,
+    respuesta: null,
+    mensajes: traducidos,
     huella: huellaPregunta(p),
     generadaEn: new Date().toISOString(),
   };

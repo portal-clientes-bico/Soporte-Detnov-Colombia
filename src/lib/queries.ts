@@ -2,6 +2,7 @@ import "server-only";
 import { leerDb } from "@/lib/db";
 import { leerTextoDocumento } from "@/lib/extraccion-texto";
 import { leerEmbeddingsDocumento } from "@/lib/embeddings";
+import { mensajesDe } from "@/lib/hilo";
 import type {
   Compatibilidad,
   Documento,
@@ -314,7 +315,7 @@ export async function getPreguntasDeMarca(marcaId: string, filtro: FiltroPregunt
       // La Organizacion ya no se guarda en la pregunta: se consulta a partir del usuario
       // asignado (ver Usuario.organizacion en db.ts).
       const asignado = p.asignadoAUsuarioId ? (db.usuarios.find((u) => u.id === p.asignadoAUsuarioId) ?? null) : null;
-      return { ...p, productos, archivos, asignadoNombre: asignado?.nombre ?? null, organizacion: asignado?.organizacion ?? null };
+      return { ...p, mensajes: mensajesDe(p), productos, archivos, asignadoNombre: asignado?.nombre ?? null, organizacion: asignado?.organizacion ?? null };
     })
     .sort(
       (a, b) =>

@@ -15,12 +15,13 @@ import {
   PREGUNTA_PRIORIDAD_VALUES,
 } from "@/lib/tipos";
 import { nombreUsuarioActual } from "@/lib/usuario-actual";
-import type { IdiomaVista } from "@/lib/db";
+import type { IdiomaVista, MensajePregunta } from "@/lib/db";
+import HiloMensajes from "../../../hilo-mensajes";
 import { TEXTOS_PREGUNTA } from "@/lib/idioma";
 import EnlaceFabrica from "./enlace-fabrica";
 
 /** Textos de la pregunta traducidos al idioma de vista (null = se muestra el original). */
-type VistaPregunta = { titulo: string; contenido: string; respuesta: string | null };
+type VistaPregunta = { titulo: string; contenido: string; mensajes: Record<string, string> };
 type Pregunta = Omit<Awaited<ReturnType<typeof getPreguntasDeMarca>>[number], "traducciones"> & { vista: VistaPregunta | null };
 type Textos = (typeof TEXTOS_PREGUNTA)[IdiomaVista];
 type Referencia = Awaited<ReturnType<typeof getReferenciasDeMarca>>[number];
@@ -466,40 +467,35 @@ export function NuevaPreguntaForm({
   );
 }
 
-function RespuestaPanel({ pregunta, respuestaMostrada, textos }: { pregunta: Pregunta; respuestaMostrada: string | null; textos: Textos }) {
+function HiloPanel({ pregunta, vista, textos, locale }: { pregunta: Pregunta; vista: VistaPregunta | null; textos: Textos; locale: string }) {
   const router = useRouter();
-  const [editando, setEditando] = useState(false);
-  const [respondedor, setRespondedor] = useState(pregunta.respondedor ?? "");
-  const [respuesta, setRespuesta] = useState(pregunta.respuesta ?? "");
-
-  useEffect(() => {
-    if (!pregunta.respondedor) {
-      const nombre = nombreUsuarioActual();
-      if (nombre) setRespondedor((prev) => prev || nombre);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const [tipo, setTipo] = useState<"RESPUESTA" | "CONTRAPREGUNTA">("RESPUESTA");
+  const [texto, setTexto] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const abierta = pregunta.estado !== "CERRADA";
 
-  async function guardar() {
-    if (!respondedor.trim() || !respuesta.trim()) {
-      setError("Completa quien responde y la respuesta.");
-      return;
-    }
+  async function publicar() {
+    if (texto.trim().length < 2) return setError("Escribe el mensaje.");
     setLoading(true);
     setError(null);
-    const res = await fetch(`/api/preguntas/${encodeURIComponent(pregunta.id)}`, {
-      method: "PATCH",
+    const res = await fetch(`/api/preguntas/${encodeURIComponent(pregunta.id)}/mensajes`, {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ respondedor, respuesta }),
+      body: JSON.stringify({ tipo, texto }),
     });
+    const data = await res.json().catch(() => ({}));
     setLoading(false);
-    if (!res.ok) {
-      setError("No se pudo guardar la respuesta");
-      return;
-    }
-    setEditando(false);
+    if (!res.ok) return setError(data.error ?? "No se pudo publicar el mensaje");
+    setTexto("");
+    setTipo("RESPUESTA");
+    router.refresh();
+  }
+
+  async function borrar(m: MensajePregunta) {
+    if (!confirm(`¿Borrar el mensaje de ${m.autor}?`)) return;
+    const res = await fetch(`/api/preguntas/${encodeURIComponent(pregunta.id)}/mensajes/${encodeURIComponent(m.id)}`, { method: "DELETE" });
+    if (!res.ok) return setError("No se pudo borrar el mensaje");
     router.refresh();
   }
 
@@ -512,58 +508,58 @@ function RespuestaPanel({ pregunta, respuestaMostrada, textos }: { pregunta: Pre
       body: JSON.stringify({ estado: "CERRADA" }),
     });
     setLoading(false);
-    if (!res.ok) {
-      setError("No se pudo cerrar la pregunta");
-      return;
-    }
+    if (!res.ok) return setError("No se pudo cerrar la pregunta");
     router.refresh();
   }
 
-  if (!editando && pregunta.respuesta) {
-    return (
-      <div className="rounded-lg bg-zinc-50 p-3 text-sm dark:bg-zinc-800/60">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-            {textos.respuestaDe} {pregunta.respondedor}
-          </p>
-          <div className="flex items-center gap-3">
-            {pregunta.estado === "ABIERTA" && (
-              <button
-                type="button"
-                onClick={declararResuelta}
-                disabled={loading}
-                className="rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-60 dark:bg-emerald-700 dark:hover:bg-emerald-600"
-              >
-                {loading ? "Cerrando..." : "Declarar Resuelta"}
-              </button>
-            )}
-            <button type="button" onClick={() => setEditando(true)} className="text-xs text-zinc-500 underline hover:text-zinc-900 dark:hover:text-zinc-50">
-              Editar respuesta
-            </button>
-          </div>
-        </div>
-        <p className="mt-1 whitespace-pre-line text-zinc-700 dark:text-zinc-300">{respuestaMostrada ?? pregunta.respuesta}</p>
-        {error && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>}
-      </div>
-    );
-  }
-
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-dashed border-zinc-300 p-3 dark:border-zinc-700">
-      <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{pregunta.respuesta ? "Editar respuesta" : "Responder"}</p>
-      <input value={respondedor} onChange={(e) => setRespondedor(e.target.value)} placeholder="Quien responde" className={inputClass} />
-      <textarea value={respuesta} onChange={(e) => setRespuesta(e.target.value)} placeholder="Respuesta" rows={2} className={inputClass} />
-      {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
-      <div className="flex gap-3">
-        <button type="button" onClick={guardar} disabled={loading} className="self-start rounded-full bg-zinc-900 px-3 py-1 text-xs font-medium text-white hover:bg-zinc-700 disabled:opacity-60 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300">
-          {loading ? "Guardando..." : "Guardar respuesta"}
-        </button>
-        {pregunta.respuesta && (
-          <button type="button" onClick={() => setEditando(false)} className="self-start text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-50">
-            Cancelar
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+          {textos.hiloTitulo} ({pregunta.mensajes.length})
+        </p>
+        {pregunta.estado === "ABIERTA" && pregunta.mensajes.length > 0 && (
+          <button
+            type="button"
+            onClick={declararResuelta}
+            disabled={loading}
+            className="rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-60 dark:bg-emerald-700 dark:hover:bg-emerald-600"
+          >
+            {loading ? "Cerrando..." : "Declarar Resuelta"}
           </button>
         )}
       </div>
+      <HiloMensajes
+        mensajes={pregunta.mensajes}
+        textos={textos.hilo}
+        traducido={vista ? (m) => vista.mensajes[m.id] ?? null : undefined}
+        locale={locale}
+        onBorrar={borrar}
+      />
+      {abierta && (
+        <div className="flex flex-col gap-2 rounded-lg border border-dashed border-zinc-300 p-3 dark:border-zinc-700">
+          <div className="flex flex-wrap items-center gap-3 text-xs">
+            <span className="font-medium text-zinc-500 dark:text-zinc-400">Agregar al hilo como</span>
+            <label className="flex items-center gap-1">
+              <input type="radio" checked={tipo === "RESPUESTA"} onChange={() => setTipo("RESPUESTA")} /> Respuesta
+            </label>
+            <label className="flex items-center gap-1">
+              <input type="radio" checked={tipo === "CONTRAPREGUNTA"} onChange={() => setTipo("CONTRAPREGUNTA")} /> Contrapregunta
+            </label>
+          </div>
+          <textarea
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            placeholder={tipo === "RESPUESTA" ? "Escribe la respuesta..." : "Escribe la contrapregunta o la información que hace falta..."}
+            rows={2}
+            className={inputClass}
+          />
+          <button type="button" onClick={publicar} disabled={loading} className="self-start rounded-full bg-zinc-900 px-3 py-1 text-xs font-medium text-white hover:bg-zinc-700 disabled:opacity-60 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300">
+            {loading ? "Publicando..." : `Publicar ${tipo === "RESPUESTA" ? "respuesta" : "contrapregunta"}`}
+          </button>
+        </div>
+      )}
+      {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
     </div>
   );
 }
@@ -883,7 +879,7 @@ function PreguntaCard({
 
         <p className="text-sm whitespace-pre-line text-zinc-700 dark:text-zinc-300">{vista?.contenido ?? pregunta.contenido}</p>
 
-        <RespuestaPanel pregunta={pregunta} respuestaMostrada={vista?.respuesta ?? null} textos={textos} />
+        <HiloPanel pregunta={pregunta} vista={vista} textos={textos} locale={idioma === "zh" ? "zh-CN" : idioma === "en" ? "en-US" : "es-CO"} />
 
         <div className="flex flex-wrap items-center gap-1.5">
           {pregunta.productos.map((r) => (

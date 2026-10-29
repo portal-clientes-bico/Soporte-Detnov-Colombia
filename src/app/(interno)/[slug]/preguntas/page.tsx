@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getDocumentosDeMarca, getMarcaPorSlug, getPreguntasDeMarca, getReferenciasDeMarca, getUsuarios } from "@/lib/queries";
 import { idiomaDeLaPeticion } from "@/lib/idioma-servidor";
+import { textoTraducido } from "@/lib/hilo";
 import { requiereTraduccion, traduccionVigente } from "@/lib/traduccion-preguntas";
 import { PREGUNTA_ESTADO_VALUES, PREGUNTA_ESTADOS, PREGUNTA_PRIORIDAD_VALUES, PREGUNTA_PRIORIDADES } from "@/lib/tipos";
 import type { SoportePreguntaEstado, SoportePreguntaPrioridad } from "@/lib/db";
@@ -35,7 +36,12 @@ export default async function PreguntasPage({
   const preguntasFiltradas = (sp.referencia ? preguntas.filter((p) => p.productos.some((r) => r.referencia === sp.referencia)) : preguntas).map(
     ({ traducciones: _traducciones, ...p }) => {
       const t = traduccionVigente({ ...p, traducciones: _traducciones }, idioma);
-      return { ...p, vista: t ? { titulo: t.titulo, contenido: t.contenido, respuesta: t.respuesta } : null };
+      const mensajes: Record<string, string> = {};
+      for (const m of p.mensajes) {
+        const traducido = textoTraducido(t, m);
+        if (traducido) mensajes[m.id] = traducido;
+      }
+      return { ...p, vista: t ? { titulo: t.titulo, contenido: t.contenido, mensajes } : null };
     },
   );
   const pendientesTraduccion = preguntasFiltradas

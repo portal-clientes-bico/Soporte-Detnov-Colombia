@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { leerDb, type Documento, type IdiomaVista, type Producto } from "@/lib/db";
 import { preguntasDelEnlace, resolverPreguntaExterna } from "@/lib/enlace-externo";
-import { IDIOMAS, IDIOMA_VALUES, normalizarIdioma } from "@/lib/idioma";
+import { IDIOMAS, IDIOMA_VALUES, TEXTOS_PREGUNTA, normalizarIdioma } from "@/lib/idioma";
+import { mensajesDe, textoTraducido } from "@/lib/hilo";
+import HiloMensajes from "../../../hilo-mensajes";
 import { asegurarTraducciones } from "@/lib/traduccion-preguntas";
 import BanderaIdioma from "../../../bandera-idioma";
 import FormulariosExterno from "./formularios";
@@ -16,6 +18,13 @@ export const metadata: Metadata = {
 
 // Puede traducir las preguntas con Claude la primera vez que se abren en un idioma.
 export const maxDuration = 120;
+
+// Mismos tonos que la vista interna de Preguntas.
+const PRIORIDAD_BADGE: Record<string, string> = {
+  ALTA: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
+  MEDIA: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+  BAJA: "bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200",
+};
 
 function href(idioma: IdiomaVista, preguntaId: string | null): string {
   return `?lang=${idioma}${preguntaId ? `&p=${encodeURIComponent(preguntaId)}` : ""}`;
@@ -77,7 +86,8 @@ export default async function ResponderPage({
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
   const contenido = vista?.contenido ?? pregunta.contenido;
-  const respuesta = vista?.respuesta ?? pregunta.respuesta;
+  const mensajes = mensajesDe(pregunta);
+  const locale = idioma === "zh" ? "zh-CN" : idioma === "en" ? "en-US" : "es-CO";
   const pActual = pregunta.id === base.id ? null : pregunta.id;
   const abiertas = menu.filter((x) => x.estado === "ABIERTA").length;
 
@@ -147,6 +157,12 @@ export default async function ResponderPage({
           <div className="flex flex-wrap items-center gap-2 text-xs">
             {marca && <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">{textos.marca}: {marca.nombre}</span>}
             <span className="rounded-full bg-sky-100 px-2 py-0.5 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">{textos.estado[pregunta.estado]}</span>
+            <span className={`rounded-full px-2 py-0.5 ${PRIORIDAD_BADGE[pregunta.prioridad]}`}>
+              {TEXTOS_PREGUNTA[idioma].prioridad}: {TEXTOS_PREGUNTA[idioma].prioridades[pregunta.prioridad]}
+            </span>
+            <span className="text-zinc-500 dark:text-zinc-400">
+              {textos.creada} {new Date(pregunta.createdAt).toLocaleDateString(locale, { dateStyle: "medium" })}
+            </span>
             {vista && <span className="text-sky-700 dark:text-sky-400">🌐 {textos.traduccion}</span>}
           </div>
           <div>
@@ -171,7 +187,11 @@ export default async function ResponderPage({
               <div className="mt-2 flex flex-col gap-2 rounded-lg bg-zinc-50 p-3 whitespace-pre-line dark:bg-zinc-800/60">
                 <p className="font-medium">{pregunta.titulo}</p>
                 <p>{pregunta.contenido}</p>
-                {pregunta.respuesta && <p>{pregunta.respuesta}</p>}
+                {mensajes.map((m) => (
+                  <p key={m.id}>
+                    {m.autor}: {m.texto}
+                  </p>
+                ))}
               </div>
             </details>
           )}
@@ -179,18 +199,12 @@ export default async function ResponderPage({
 
         <section className="flex flex-col gap-2">
           <h2 className="text-lg font-semibold">{textos.respuestas}</h2>
-          {respuesta ? (
-            <div className="rounded-xl bg-zinc-100 p-4 text-sm dark:bg-zinc-800/60">
-              {pregunta.respondedor && (
-                <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                  {textos.respondida} {pregunta.respondedor}
-                </p>
-              )}
-              <p className="mt-1 whitespace-pre-line text-zinc-800 dark:text-zinc-200">{respuesta}</p>
-            </div>
-          ) : (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">{textos.sinRespuesta}</p>
-          )}
+          <HiloMensajes
+            mensajes={mensajes}
+            textos={TEXTOS_PREGUNTA[idioma].hilo}
+            traducido={(m) => textoTraducido(vista, m)}
+            locale={locale}
+          />
         </section>
 
         <section className="flex flex-col gap-2">

@@ -447,7 +447,8 @@ function formatearPreguntasDetalle(preguntas: PreguntaCtx[]): string {
     .map((p) => {
       const partes = [`- [PREGUNTA CERRADA] "${p.titulo}"`];
       partes.push(`  Pregunta: ${p.contenido}`);
-      partes.push(`  Respuesta${p.respondedor ? ` de ${p.respondedor}` : ""}: ${p.respuesta}`);
+      // "respuesta" es el hilo completo (respuestas y contrapreguntas con autor y fecha; ver hilo.ts).
+      partes.push(`  Hilo de respuestas${p.respondedor ? ` (${p.respondedor})` : ""}:\n${p.respuesta.replace(/^/gm, "    ")}`);
       if (p.referencias.length > 0) partes.push(`  Referencias: ${p.referencias.join(", ")}`);
       return partes.join("\n");
     })

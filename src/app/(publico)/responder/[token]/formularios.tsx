@@ -33,6 +33,7 @@ export default function FormulariosExterno({ token, preguntaId, textos }: { toke
   const router = useRouter();
   const [nombre, setNombre] = useNombre();
   const [respuesta, setRespuesta] = useState("");
+  const [tipo, setTipo] = useState<"RESPUESTA" | "CONTRAPREGUNTA">("RESPUESTA");
   const [titulo, setTitulo] = useState("");
   const [archivo, setArchivo] = useState<File | null>(null);
   const [inputKey, setInputKey] = useState(0);
@@ -47,12 +48,13 @@ export default function FormulariosExterno({ token, preguntaId, textos }: { toke
     const res = await fetch(`/api/externo/${encodeURIComponent(token)}/respuesta`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nombre, respuesta, preguntaId }),
+      body: JSON.stringify({ nombre, respuesta, tipo, preguntaId }),
     }).catch(() => null);
     const data = (await res?.json().catch(() => ({}))) ?? {};
     setEnviando(null);
     if (!res?.ok) return setMensaje({ ok: false, texto: `${textos.error}: ${data.error ?? ""}` });
     setRespuesta("");
+    setTipo("RESPUESTA");
     setMensaje({ ok: true, texto: textos.enviada });
     router.refresh();
   }
@@ -91,6 +93,14 @@ export default function FormulariosExterno({ token, preguntaId, textos }: { toke
 
       <form onSubmit={enviarRespuesta} className="flex flex-col gap-2 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
         <p className="font-medium">{textos.nuevaRespuesta}</p>
+        <div className="flex flex-wrap items-center gap-4 text-sm">
+          <label className="flex items-center gap-1.5">
+            <input type="radio" checked={tipo === "RESPUESTA"} onChange={() => setTipo("RESPUESTA")} /> {textos.tipoRespuesta}
+          </label>
+          <label className="flex items-center gap-1.5">
+            <input type="radio" checked={tipo === "CONTRAPREGUNTA"} onChange={() => setTipo("CONTRAPREGUNTA")} /> {textos.tipoContrapregunta}
+          </label>
+        </div>
         <textarea value={respuesta} onChange={(e) => setRespuesta(e.target.value)} required minLength={2} rows={6} placeholder={textos.respuesta} className={inputClass} />
         <button type="submit" disabled={enviando !== null} className={botonClass}>
           {enviando === "respuesta" ? textos.enviando : textos.enviar}

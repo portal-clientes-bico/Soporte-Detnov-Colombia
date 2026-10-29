@@ -152,8 +152,15 @@ export const preguntaSchema = preguntaCamposSchema.extend({
   documentos: z.array(z.string().min(1)).optional(),
 });
 
-export const preguntaPatchSchema = preguntaCamposSchema.partial().extend({
+// La respuesta ya no se edita directo: se arma con el hilo de mensajes (ver src/lib/hilo.ts).
+export const preguntaPatchSchema = preguntaCamposSchema.omit({ respondedor: true, respuesta: true }).partial().extend({
   estado: z.enum(PREGUNTA_ESTADO_VALUES).optional(),
+});
+
+/** Mensaje del hilo de una pregunta: respuesta o contrapregunta. */
+export const mensajePreguntaSchema = z.object({
+  tipo: z.enum(["RESPUESTA", "CONTRAPREGUNTA"]),
+  texto: z.string().trim().min(2).max(20000),
 });
 
 export const preguntaArchivoCamposSchema = z.object({

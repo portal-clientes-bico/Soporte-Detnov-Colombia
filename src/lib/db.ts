@@ -194,6 +194,11 @@ export interface Pregunta {
   respuesta: string | null;
   estado: SoportePreguntaEstado;
   fechaCierre: string | null;
+  /** Hilo de respuestas y contrapreguntas (de varias personas, internas o de la fabrica) hasta
+   * que la pregunta se resuelve. "respuesta"/"respondedor" quedan como resumen del hilo para
+   * el ChatBot y el reporte (ver src/lib/hilo.ts). Las preguntas anteriores al hilo no lo tienen:
+   * su respuesta unica se lee como un primer mensaje (mensajesDe). */
+  mensajes?: MensajePregunta[];
   /** Traducciones automaticas (Claude) guardadas por idioma de vista. Se generan bajo demanda
    * la primera vez que alguien ve la pregunta en ese idioma; "huella" identifica el texto
    * original traducido, asi que si el titulo/contenido/respuesta cambian queda desactualizada
@@ -210,6 +215,18 @@ export interface Pregunta {
 /** Idiomas en los que se pueden ver las preguntas internas (icono de idioma del encabezado). */
 export type IdiomaVista = "es" | "en" | "zh";
 
+export type TipoMensajePregunta = "RESPUESTA" | "CONTRAPREGUNTA";
+
+export interface MensajePregunta {
+  id: string;
+  tipo: TipoMensajePregunta;
+  autor: string;
+  /** INTERNO = usuario de la herramienta; EXTERNO = funcionario de la fabrica (enlace). */
+  origen: "INTERNO" | "EXTERNO";
+  texto: string;
+  fecha: string;
+}
+
 export interface EnlaceExterno {
   token: string;
   creadoEn: string;
@@ -220,6 +237,8 @@ export interface TraduccionPregunta {
   titulo: string;
   contenido: string;
   respuesta: string | null;
+  /** Texto traducido de cada mensaje del hilo, por id. */
+  mensajes?: Record<string, string>;
   huella: string;
   generadaEn: string;
 }

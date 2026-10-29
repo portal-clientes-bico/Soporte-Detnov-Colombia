@@ -12,7 +12,7 @@ function formatFecha(iso: string | null): string {
 }
 
 /** Un bloque de parrafos con el detalle completo de una pregunta: metadata, el contenido
- * textual de la pregunta, la respuesta (si existe) y sus productos/documentos relacionados.
+ * textual de la pregunta, el hilo de respuestas y contrapreguntas y sus productos/documentos.
  * Este es el "en detalle" que pidio el usuario -- no un resumen de una linea. */
 function bloquePregunta(p: Pregunta): Paragraph[] {
   const metadata = [
@@ -34,13 +34,19 @@ function bloquePregunta(p: Pregunta): Paragraph[] {
     }),
   ];
 
-  if (p.respuesta) {
-    parrafos.push(
-      new Paragraph({
-        spacing: { after: 120 },
-        children: [new TextRun({ text: `Respuesta de ${p.respondedor ?? "—"}: `, bold: true }), new TextRun(p.respuesta)],
-      }),
-    );
+  if (p.mensajes.length > 0) {
+    // Hilo completo: cada respuesta o contrapregunta con su autor y fecha.
+    parrafos.push(new Paragraph({ spacing: { after: 60 }, children: [new TextRun({ text: "Respuestas y contrapreguntas:", bold: true })] }));
+    for (const m of p.mensajes) {
+      const encabezado = `${formatFecha(m.fecha)} · ${m.autor}${m.origen === "EXTERNO" ? " (fábrica)" : ""} · ${m.tipo === "CONTRAPREGUNTA" ? "Contrapregunta" : "Respuesta"}: `;
+      parrafos.push(
+        new Paragraph({
+          spacing: { after: 80 },
+          indent: { left: 360 },
+          children: [new TextRun({ text: encabezado, bold: true, size: 20 }), new TextRun(m.texto)],
+        }),
+      );
+    }
   } else {
     parrafos.push(new Paragraph({ spacing: { after: 120 }, children: [new TextRun({ text: "Sin respuesta todavia.", italics: true, color: "999999" })] }));
   }

@@ -1,16 +1,19 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { mutarDb } from "@/lib/db";
-import { agregarRespuestaExterna, resolverPreguntaExterna } from "@/lib/enlace-externo";
+import { mutarDb, nuevoId, ahora } from "@/lib/db";
+import { resolverPreguntaExterna } from "@/lib/enlace-externo";
+import { agregarMensaje } from "@/lib/hilo";
 
 const schema = z.object({
   nombre: z.string().trim().min(2).max(120),
   respuesta: z.string().trim().min(2).max(20000),
+  tipo: z.enum(["RESPUESTA", "CONTRAPREGUNTA"]).default("RESPUESTA"),
   /** Otra pregunta no resuelta de la misma marca, elegida en el menu (si no, la del enlace). */
   preguntaId: z.string().min(1).max(60).optional(),
 });
 
-/** Respuesta desde el enlace externo (sin sesion: el token del enlace es la autorizacion). */
+/** Respuesta o contrapregunta desde el enlace externo (sin sesion: el token del enlace es la
+ * autorizacion). Se agrega al hilo de la pregunta con nombre y fecha. */
 export async function POST(request: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const parsed = schema.safeParse(await request.json().catch(() => null));
@@ -20,7 +23,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     const pregunta = resolverPreguntaExterna(db, token, parsed.data.preguntaId)?.pregunta;
     if (!pregunta) return 404 as const;
     if (pregunta.estado === "CERRADA") return 409 as const;
-    agregarRespuestaExterna(pregunta, parsed.data.nombre, parsed.data.respuesta);
+    agregarMensaje(pregunta, {
+      id: nuevoId(),
+      tipo: parsed.data.tipo,
+      autor: parsed.data.nombre,
+      origen: "EXTERNO",
+      texto: parsed.data.respuesta,
+      fecha: ahora(),
+    });
     return 200 as const;
   });
 

@@ -1,6 +1,6 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
-import { ahora, type Db, type Pregunta } from "@/lib/db";
+import type { Db, Pregunta } from "@/lib/db";
 
 /** Token aleatorio de 32 bytes (no adivinable): es la unica "clave" del enlace externo. */
 export function nuevoTokenEnlace(): string {
@@ -35,22 +35,4 @@ export function resolverPreguntaExterna(db: Db, token: string, preguntaId?: stri
   if (!preguntaId || preguntaId === base.id) return { base, pregunta: base };
   const pregunta = preguntasDelEnlace(db, base).find((p) => p.id === preguntaId);
   return pregunta ? { base, pregunta } : null;
-}
-
-/**
- * Agrega la respuesta de un funcionario de la fabrica. La pregunta tiene un solo campo de
- * respuesta: si ya habia una, la nueva se anexa debajo con nombre y fecha, sin borrar lo que
- * respondio el equipo u otra persona.
- */
-export function agregarRespuestaExterna(pregunta: Pregunta, nombre: string, texto: string): void {
-  const fecha = ahora().slice(0, 10);
-  if (!pregunta.respuesta?.trim()) {
-    pregunta.respuesta = texto;
-    pregunta.respondedor = nombre;
-  } else {
-    pregunta.respuesta = `${pregunta.respuesta.trimEnd()}\n\n— ${nombre} (${fecha}):\n${texto}`;
-    const respondedores = (pregunta.respondedor ?? "").split(",").map((r) => r.trim()).filter(Boolean);
-    if (!respondedores.includes(nombre)) pregunta.respondedor = [...respondedores, nombre].join(", ");
-  }
-  pregunta.updatedAt = ahora();
 }
