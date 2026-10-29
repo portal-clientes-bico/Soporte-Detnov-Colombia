@@ -1,7 +1,10 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import UsuarioActualBar from "./usuario-actual-bar";
+import SelectorIdioma from "./selector-idioma";
 import { sesionActual } from "@/lib/sesion-actual";
+import { COOKIE_IDIOMA, normalizarIdioma } from "@/lib/idioma";
 
 // Mismo criterio que en db.ts/storage.ts para elegir backend: si hay POSTGRES_URL, esta
 // corriendo publicado en la nube (Postgres + Vercel Blob), no en disco local.
@@ -11,6 +14,7 @@ export default async function InternoLayout({ children }: { children: React.Reac
   // src/proxy.ts ya redirige sin sesion; esto es una segunda barrera por si el proxy no corre.
   const sesion = await sesionActual();
   if (!sesion) redirect("/login");
+  const idioma = normalizarIdioma((await cookies()).get(COOKIE_IDIOMA)?.value);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -30,6 +34,7 @@ export default async function InternoLayout({ children }: { children: React.Reac
             )}
           </p>
           <div className="flex shrink-0 items-center gap-4">
+            <SelectorIdioma idioma={idioma} />
             <Link href="/usuarios" className="text-xs text-zinc-500 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50">
               Usuarios
             </Link>

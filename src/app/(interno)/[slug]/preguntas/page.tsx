@@ -1,5 +1,8 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { getDocumentosDeMarca, getMarcaPorSlug, getPreguntasDeMarca, getReferenciasDeMarca, getUsuarios } from "@/lib/queries";
+import { COOKIE_IDIOMA, normalizarIdioma } from "@/lib/idioma";
+import { requiereTraduccion, traduccionVigente } from "@/lib/traduccion-preguntas";
 import { PREGUNTA_ESTADO_VALUES, PREGUNTA_ESTADOS, PREGUNTA_PRIORIDAD_VALUES, PREGUNTA_PRIORIDADES } from "@/lib/tipos";
 import type { SoportePreguntaEstado, SoportePreguntaPrioridad } from "@/lib/db";
 import PreguntasManager, { NuevaPreguntaForm } from "./preguntas-manager";
@@ -27,7 +30,18 @@ export default async function PreguntasPage({
     getDocumentosDeMarca(marca.id),
   ]);
 
-  const preguntasFiltradas = sp.referencia ? preguntas.filter((p) => p.productos.some((r) => r.referencia === sp.referencia)) : preguntas;
+  const idioma = normalizarIdioma((await cookies()).get(COOKIE_IDIOMA)?.value);
+  // "vista": la traduccion vigente al idioma elegido (o null = se muestra el original). Las
+  // traducciones guardadas de otros idiomas no viajan al navegador.
+  const preguntasFiltradas = (sp.referencia ? preguntas.filter((p) => p.productos.some((r) => r.referencia === sp.referencia)) : preguntas).map(
+    ({ traducciones: _traducciones, ...p }) => {
+      const t = traduccionVigente({ ...p, traducciones: _traducciones }, idioma);
+      return { ...p, vista: t ? { titulo: t.titulo, contenido: t.contenido, respuesta: t.respuesta } : null };
+    },
+  );
+  const pendientesTraduccion = preguntasFiltradas
+    .filter((p) => !p.vista && requiereTraduccion(p, idioma))
+    .map((p) => p.id);
 
   return (
     <div className="flex flex-col gap-6">
@@ -91,7 +105,16 @@ export default async function PreguntasPage({
         </div>
       </div>
 
-      <PreguntasManager marcaId={marca.id} preguntas={preguntasFiltradas} referencias={referencias} usuarios={usuarios} documentos={documentos} slug={slug} />
+      <PreguntasManager
+        marcaId={marca.id}
+        preguntas={preguntasFiltradas}
+        referencias={referencias}
+        usuarios={usuarios}
+        documentos={documentos}
+        slug={slug}
+        idioma={idioma}
+        pendientesTraduccion={pendientesTraduccion}
+      />
     </div>
   );
 }

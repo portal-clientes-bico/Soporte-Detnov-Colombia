@@ -194,8 +194,24 @@ export interface Pregunta {
   respuesta: string | null;
   estado: SoportePreguntaEstado;
   fechaCierre: string | null;
+  /** Traducciones automaticas (Claude) guardadas por idioma de vista. Se generan bajo demanda
+   * la primera vez que alguien ve la pregunta en ese idioma; "huella" identifica el texto
+   * original traducido, asi que si el titulo/contenido/respuesta cambian queda desactualizada
+   * y se regenera. Ver src/lib/traduccion-preguntas.ts. */
+  traducciones?: Partial<Record<IdiomaVista, TraduccionPregunta>>;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Idiomas en los que se pueden ver las preguntas internas (icono de idioma del encabezado). */
+export type IdiomaVista = "es" | "en" | "zh";
+
+export interface TraduccionPregunta {
+  titulo: string;
+  contenido: string;
+  respuesta: string | null;
+  huella: string;
+  generadaEn: string;
 }
 
 export interface PreguntaProducto {

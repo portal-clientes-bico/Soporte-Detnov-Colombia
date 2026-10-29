@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { getDocumentosDeMarca, getPreguntasDeMarca, getReferenciasDeMarca, getUsuarios } from "@/lib/queries";
 import {
@@ -15,8 +15,13 @@ import {
   PREGUNTA_PRIORIDAD_VALUES,
 } from "@/lib/tipos";
 import { nombreUsuarioActual } from "@/lib/usuario-actual";
+import type { IdiomaVista } from "@/lib/db";
+import { TEXTOS_PREGUNTA } from "@/lib/idioma";
 
-type Pregunta = Awaited<ReturnType<typeof getPreguntasDeMarca>>[number];
+/** Textos de la pregunta traducidos al idioma de vista (null = se muestra el original). */
+type VistaPregunta = { titulo: string; contenido: string; respuesta: string | null };
+type Pregunta = Omit<Awaited<ReturnType<typeof getPreguntasDeMarca>>[number], "traducciones"> & { vista: VistaPregunta | null };
+type Textos = (typeof TEXTOS_PREGUNTA)[IdiomaVista];
 type Referencia = Awaited<ReturnType<typeof getReferenciasDeMarca>>[number];
 type Usuario = Awaited<ReturnType<typeof getUsuarios>>[number];
 type DocumentoItem = Awaited<ReturnType<typeof getDocumentosDeMarca>>[number];
@@ -460,7 +465,7 @@ export function NuevaPreguntaForm({
   );
 }
 
-function RespuestaPanel({ pregunta }: { pregunta: Pregunta }) {
+function RespuestaPanel({ pregunta, respuestaMostrada, textos }: { pregunta: Pregunta; respuestaMostrada: string | null; textos: Textos }) {
   const router = useRouter();
   const [editando, setEditando] = useState(false);
   const [respondedor, setRespondedor] = useState(pregunta.respondedor ?? "");
@@ -517,7 +522,9 @@ function RespuestaPanel({ pregunta }: { pregunta: Pregunta }) {
     return (
       <div className="rounded-lg bg-zinc-50 p-3 text-sm dark:bg-zinc-800/60">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Respuesta de {pregunta.respondedor}</p>
+          <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+            {textos.respuestaDe} {pregunta.respondedor}
+          </p>
           <div className="flex items-center gap-3">
             {pregunta.estado === "ABIERTA" && (
               <button
@@ -534,7 +541,7 @@ function RespuestaPanel({ pregunta }: { pregunta: Pregunta }) {
             </button>
           </div>
         </div>
-        <p className="mt-1 text-zinc-700 dark:text-zinc-300">{pregunta.respuesta}</p>
+        <p className="mt-1 whitespace-pre-line text-zinc-700 dark:text-zinc-300">{respuestaMostrada ?? pregunta.respuesta}</p>
         {error && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>}
       </div>
     );
@@ -675,9 +682,28 @@ function ArchivosPanel({ pregunta, documentosDisponibles }: { pregunta: Pregunta
   );
 }
 
-function PreguntaCard({ pregunta, referencias, usuarios, documentos }: { pregunta: Pregunta; referencias: Referencia[]; usuarios: Usuario[]; documentos: DocumentoItem[] }) {
+function PreguntaCard({
+  pregunta,
+  referencias,
+  usuarios,
+  documentos,
+  idioma,
+  traduciendo,
+  onTraducir,
+}: {
+  pregunta: Pregunta;
+  referencias: Referencia[];
+  usuarios: Usuario[];
+  documentos: DocumentoItem[];
+  idioma: IdiomaVista;
+  traduciendo: boolean;
+  onTraducir: (id: string) => void;
+}) {
   const router = useRouter();
   const [editando, setEditando] = useState(false);
+  const [verOriginal, setVerOriginal] = useState(false);
+  const textos = TEXTOS_PREGUNTA[idioma];
+  const vista = pregunta.vista && !verOriginal ? pregunta.vista : null;
   const [valores, setValores] = useState({
     estado: pregunta.estado,
     prioridad: pregunta.prioridad,
@@ -799,15 +825,17 @@ function PreguntaCard({ pregunta, referencias, usuarios, documentos }: { pregunt
     >
       <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 select-none marker:content-none">
         <span className={CHEVRON_CLASS}><Chevron /></span>
-        <p className="font-medium">{pregunta.titulo}</p>
+        <p className="font-medium">{vista?.titulo ?? pregunta.titulo}</p>
       </summary>
 
       <div className="flex flex-col gap-3 px-4 pb-4">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`rounded-full px-2 py-0.5 text-xs ${prioridadBadge[pregunta.prioridad]}`}>Prioridad {PREGUNTA_PRIORIDADES[pregunta.prioridad]}</span>
-              <span className={`rounded-full px-2 py-0.5 text-xs ${estadoBadge[pregunta.estado]}`}>{PREGUNTA_ESTADOS[pregunta.estado]}</span>
+              <span className={`rounded-full px-2 py-0.5 text-xs ${prioridadBadge[pregunta.prioridad]}`}>
+                {textos.prioridad} {textos.prioridades[pregunta.prioridad]}
+              </span>
+              <span className={`rounded-full px-2 py-0.5 text-xs ${estadoBadge[pregunta.estado]}`}>{textos.estados[pregunta.estado]}</span>
               <span
                 className={`rounded-full px-2 py-0.5 text-xs ${pregunta.organizacion ? organizacionBadge[pregunta.organizacion] : SIN_ASIGNAR_BADGE}`}
                 title="Se consulta a partir del usuario asignado (campo 'Asignado a')"
@@ -816,10 +844,28 @@ function PreguntaCard({ pregunta, referencias, usuarios, documentos }: { pregunt
               </span>
             </div>
             <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-              Preguntó {pregunta.autor} · {formatFechaHora(pregunta.createdAt)}
-              {pregunta.fechaCierre ? ` · Cerrada ${formatFechaHora(pregunta.fechaCierre)}` : ""}
-              {pregunta.asignadoNombre ? ` · Asignado a ${pregunta.asignadoNombre}` : ""}
+              {textos.pregunto} {pregunta.autor} · {formatFechaHora(pregunta.createdAt)}
+              {pregunta.fechaCierre ? ` · ${textos.cerrada} ${formatFechaHora(pregunta.fechaCierre)}` : ""}
+              {pregunta.asignadoNombre ? ` · ${textos.asignadoA} ${pregunta.asignadoNombre}` : ""}
             </p>
+            {pregunta.vista ? (
+              <p className="mt-1 flex items-center gap-2 text-xs text-sky-700 dark:text-sky-400">
+                <span>🌐 {verOriginal ? textos.verOriginal : textos.traduccionAutomatica}</span>
+                <button type="button" onClick={() => setVerOriginal((v) => !v)} className="underline hover:text-sky-900 dark:hover:text-sky-200">
+                  {verOriginal ? textos.verTraduccion : textos.verOriginal}
+                </button>
+              </p>
+            ) : idioma === "es" ? (
+              <button
+                type="button"
+                onClick={() => onTraducir(pregunta.id)}
+                disabled={traduciendo}
+                className="mt-1 text-xs text-zinc-500 underline hover:text-zinc-900 disabled:opacity-60 dark:hover:text-zinc-50"
+                title="Para preguntas o respuestas escritas en otro idioma (p. ej. inglés)"
+              >
+                🌐 {textos.traducirAlEspanol}
+              </button>
+            ) : null}
           </div>
           <div className="flex shrink-0 items-center gap-3 text-xs">
             <button type="button" onClick={avanzarEstado} disabled={loading} className="text-zinc-500 underline hover:text-zinc-900 disabled:opacity-60 dark:hover:text-zinc-50">
@@ -834,9 +880,9 @@ function PreguntaCard({ pregunta, referencias, usuarios, documentos }: { pregunt
           </div>
         </div>
 
-        <p className="text-sm text-zinc-700 dark:text-zinc-300">{pregunta.contenido}</p>
+        <p className="text-sm whitespace-pre-line text-zinc-700 dark:text-zinc-300">{vista?.contenido ?? pregunta.contenido}</p>
 
-        <RespuestaPanel pregunta={pregunta} />
+        <RespuestaPanel pregunta={pregunta} respuestaMostrada={vista?.respuesta ?? null} textos={textos} />
 
         <div className="flex flex-wrap items-center gap-1.5">
           {pregunta.productos.map((r) => (
@@ -881,11 +927,15 @@ function agruparPreguntas(preguntas: Pregunta[]): Map<string | null, Map<string 
   return porOrganizacion;
 }
 
+const LOTE_TRADUCCION = 20;
+
 export default function PreguntasManager({
   preguntas,
   referencias,
   usuarios,
   documentos,
+  idioma,
+  pendientesTraduccion,
 }: {
   marcaId: string;
   preguntas: Pregunta[];
@@ -893,12 +943,50 @@ export default function PreguntasManager({
   usuarios: Usuario[];
   documentos: DocumentoItem[];
   slug: string;
+  idioma: IdiomaVista;
+  /** Preguntas sin traduccion vigente al idioma de vista: se traducen al cargar la pagina. */
+  pendientesTraduccion: string[];
 }) {
+  const router = useRouter();
+  const textos = TEXTOS_PREGUNTA[idioma];
+  const [traduciendo, setTraduciendo] = useState(false);
+  const [errorTraduccion, setErrorTraduccion] = useState<string | null>(null);
+  // Lo ya intentado no se reintenta solo (si la API falla no queda en un ciclo de recargas).
+  const intentadas = useRef(new Set<string>());
+
+  async function traducir(ids: string[]) {
+    setTraduciendo(true);
+    setErrorTraduccion(null);
+    let algunaTraducida = false;
+    for (let i = 0; i < ids.length; i += LOTE_TRADUCCION) {
+      const res = await fetch("/api/preguntas/traducir", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idioma, ids: ids.slice(i, i + LOTE_TRADUCCION) }),
+      }).catch(() => null);
+      const data = (await res?.json().catch(() => ({}))) ?? {};
+      if (res?.ok && data.traducidas > 0) algunaTraducida = true;
+      if (!res?.ok || data.errores?.length) setErrorTraduccion(`${textos.errorTraduccion}: ${data.error ?? data.errores?.[0] ?? ""}`);
+    }
+    setTraduciendo(false);
+    if (algunaTraducida) router.refresh();
+  }
+
+  useEffect(() => {
+    const nuevas = pendientesTraduccion.filter((id) => !intentadas.current.has(`${idioma}:${id}`));
+    if (nuevas.length === 0) return;
+    nuevas.forEach((id) => intentadas.current.add(`${idioma}:${id}`));
+    void traducir(nuevas);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idioma, pendientesTraduccion.join(",")]);
+
   const porOrganizacion = agruparPreguntas(preguntas);
   const organizacionesOrdenadas = [...porOrganizacion.keys()].sort((a, b) => ordenOrganizacion(a) - ordenOrganizacion(b));
 
   return (
     <div className="flex flex-col gap-4">
+      {traduciendo && <p className="text-sm text-sky-700 dark:text-sky-400">🌐 {textos.traduciendo}</p>}
+      {errorTraduccion && <p className="text-sm text-red-600 dark:text-red-400">{errorTraduccion}</p>}
       {preguntas.length === 0 ? (
         <p className="text-sm text-zinc-500 dark:text-zinc-400">Ninguna pregunta coincide con el filtro.</p>
       ) : (
@@ -935,7 +1023,16 @@ export default function PreguntasManager({
                         </summary>
                         <div className="flex flex-col gap-2 border-t border-zinc-200 p-3 dark:border-zinc-800">
                           {items.map((p) => (
-                            <PreguntaCard key={p.id} pregunta={p} referencias={referencias} usuarios={usuarios} documentos={documentos} />
+                            <PreguntaCard
+                              key={p.id}
+                              pregunta={p}
+                              referencias={referencias}
+                              usuarios={usuarios}
+                              documentos={documentos}
+                              idioma={idioma}
+                              traduciendo={traduciendo}
+                              onTraducir={(id) => void traducir([id])}
+                            />
                           ))}
                         </div>
                       </details>
