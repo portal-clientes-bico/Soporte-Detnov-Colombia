@@ -59,7 +59,7 @@ export const TEXTOS_PREGUNTA: Record<
 > = {
   es: {
     prioridad: "Prioridad",
-    prioridades: { ALTA: "Alta", MEDIA: "Media", BAJA: "Baja" },
+    prioridades: { CRITICA: "Crítico", ALTA: "Alta", MEDIA: "Media", BAJA: "Baja" },
     estados: { BORRADOR: "Borrador", ABIERTA: "Abierta", CERRADA: "Cerrada" },
     pregunto: "Preguntó",
     cerrada: "Cerrada",
@@ -76,7 +76,7 @@ export const TEXTOS_PREGUNTA: Record<
   },
   en: {
     prioridad: "Priority",
-    prioridades: { ALTA: "High", MEDIA: "Medium", BAJA: "Low" },
+    prioridades: { CRITICA: "Critical", ALTA: "High", MEDIA: "Medium", BAJA: "Low" },
     estados: { BORRADOR: "Draft", ABIERTA: "Open", CERRADA: "Closed" },
     pregunto: "Asked by",
     cerrada: "Closed",
@@ -93,7 +93,7 @@ export const TEXTOS_PREGUNTA: Record<
   },
   zh: {
     prioridad: "优先级",
-    prioridades: { ALTA: "高", MEDIA: "中", BAJA: "低" },
+    prioridades: { CRITICA: "紧急", ALTA: "高", MEDIA: "中", BAJA: "低" },
     estados: { BORRADOR: "草稿", ABIERTA: "待处理", CERRADA: "已关闭" },
     pregunto: "提问人",
     cerrada: "关闭于",

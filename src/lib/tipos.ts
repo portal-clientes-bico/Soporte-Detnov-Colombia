@@ -248,6 +248,7 @@ export const HALLAZGO_ESTADOS: Record<SoporteHallazgoEstado, string> = {
 export const HALLAZGO_ESTADO_VALUES = Object.keys(HALLAZGO_ESTADOS) as SoporteHallazgoEstado[];
 
 export const PREGUNTA_PRIORIDADES: Record<SoportePreguntaPrioridad, string> = {
+  CRITICA: "Crítico",
   ALTA: "Alta",
   MEDIA: "Media",
   BAJA: "Baja",

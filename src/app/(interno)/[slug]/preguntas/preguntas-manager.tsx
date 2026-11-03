@@ -34,6 +34,7 @@ const inputClass =
   "w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50";
 
 const prioridadBadge: Record<string, string> = {
+  CRITICA: "bg-red-200 font-medium text-red-900 dark:bg-red-800/60 dark:text-red-200",
   ALTA: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
   MEDIA: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
   BAJA: "bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200",
@@ -50,8 +51,9 @@ const estadoBadge: Record<string, string> = {
 
 /** Color de fondo/borde de la ficha de la pregunta segun su prioridad -- tonos muy tenues
  * (rojo/naranja/amarillo) para que se note la prioridad de un vistazo sin que el color grite
- * mas que el contenido. */
+ * mas que el contenido. Critico usa un rojo un punto mas intenso que Alta. */
 const prioridadCardClass: Record<string, string> = {
+  CRITICA: "border-red-300 bg-red-200/70 dark:border-red-800/60 dark:bg-red-950/40",
   ALTA: "border-red-200 bg-red-100/70 dark:border-red-900/40 dark:bg-red-950/20",
   MEDIA: "border-orange-200 bg-orange-100/70 dark:border-orange-900/40 dark:bg-orange-950/20",
   BAJA: "border-yellow-200 bg-yellow-100/70 dark:border-yellow-900/40 dark:bg-yellow-950/20",
