@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { EnlaceExterno, IdiomaVista } from "@/lib/db";
+import type { EnlaceExterno, IdiomaVista, SoportePreguntaEstado } from "@/lib/db";
 import { IDIOMAS, IDIOMA_VALUES } from "@/lib/idioma";
 import BanderaIdioma from "../../../bandera-idioma";
 
@@ -11,7 +11,17 @@ import BanderaIdioma from "../../../bandera-idioma";
  * /responder/<token>, ven la pregunta en su idioma y pueden responder y adjuntar documentos.
  * Se copia en el idioma que se quiera (?lang=), se comparte por WhatsApp o se revoca.
  */
-export default function EnlaceFabrica({ preguntaId, titulo, enlace }: { preguntaId: string; titulo: string; enlace: EnlaceExterno | null | undefined }) {
+export default function EnlaceFabrica({
+  preguntaId,
+  titulo,
+  estado,
+  enlace,
+}: {
+  preguntaId: string;
+  titulo: string;
+  estado: SoportePreguntaEstado;
+  enlace: EnlaceExterno | null | undefined;
+}) {
   const router = useRouter();
   const [origen, setOrigen] = useState("");
   const [loading, setLoading] = useState(false);
@@ -69,6 +79,13 @@ export default function EnlaceFabrica({ preguntaId, titulo, enlace }: { pregunta
       <p className="text-zinc-600 dark:text-zinc-400">
         Quien tenga el enlace puede ver la pregunta, responderla y adjuntar documentos. Copia el enlace en el idioma de quien lo recibe.
       </p>
+      {estado !== "ABIERTA" && (
+        <p className="rounded-md bg-amber-100 px-2 py-1 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
+          {estado === "BORRADOR"
+            ? "Esta pregunta está en Borrador: quien abra el enlace no podrá verla hasta que la publiques."
+            : "Esta pregunta está Cerrada: el enlace la muestra, pero ya no se puede responder."}
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         {IDIOMA_VALUES.map((i) => (
           <button

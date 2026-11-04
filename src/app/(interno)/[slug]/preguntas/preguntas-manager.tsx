@@ -899,7 +899,7 @@ function PreguntaCard({
 
         <ArchivosPanel pregunta={pregunta} documentosDisponibles={documentosDisponibles} />
 
-        <EnlaceFabrica preguntaId={pregunta.id} titulo={pregunta.titulo} enlace={pregunta.enlaceExterno} />
+        <EnlaceFabrica preguntaId={pregunta.id} titulo={pregunta.titulo} estado={pregunta.estado} enlace={pregunta.enlaceExterno} />
 
         {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
       </div>

@@ -54,12 +54,13 @@ export default async function ResponderPage({
 
   const db = await leerDb();
   const base = preguntaPorToken(db, token);
-  // Solo se ven preguntas abiertas: la pedida (?p=), la del enlace o, si esa ya se cerro, la
-  // primera abierta de la marca.
+  // El menu solo lista preguntas abiertas. La pagina muestra la elegida en el menu (?p=) o, sin
+  // elegir, SIEMPRE la propia pregunta del enlace: si ya se cerro se ve sin poder responder; si
+  // esta en borrador (interna) no se muestra. Nunca se cambia por otra pregunta.
   const menu = base ? preguntasDelEnlace(db, base) : [];
-  const pregunta = menu.find((x) => x.id === p) ?? menu.find((x) => x.id === base?.id) ?? menu[0] ?? null;
+  const pregunta = (p ? menu.find((x) => x.id === p) : null) ?? (base && base.estado !== "BORRADOR" ? base : null);
   if (!base || !pregunta) {
-    const clave = base ? "sinAbiertas" : "noValido";
+    const clave = !base ? "noValido" : base.estado === "BORRADOR" ? "noDisponible" : "sinAbiertas";
     return (
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-16 text-center sm:px-6">
         <p className="text-zinc-600 dark:text-zinc-400">
