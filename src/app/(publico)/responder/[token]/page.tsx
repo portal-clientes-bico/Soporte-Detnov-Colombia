@@ -23,6 +23,7 @@ export const maxDuration = 120;
 
 // Mismos tonos que la vista interna de Preguntas.
 const PRIORIDAD_BADGE: Record<string, string> = {
+  CRITICA: "bg-red-200 font-medium text-red-900 dark:bg-red-800/60 dark:text-red-200",
   ALTA: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
   MEDIA: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
   BAJA: "bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200",

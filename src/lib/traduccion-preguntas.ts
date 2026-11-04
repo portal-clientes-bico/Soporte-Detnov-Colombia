@@ -79,6 +79,7 @@ Reglas:
 - Si un fragmento ya esta en el idioma destino, dejalo igual. Si el texto mezcla idiomas, entrega todo en el idioma destino.
 - Conserva saltos de linea, listas y numeracion. No agregues notas, explicaciones ni comillas.
 - Los hipervinculos vienen como [texto](url): traduce solo el texto entre corchetes y deja la url exactamente igual. No modifiques las URL sueltas.
+- Las imagenes vienen como ![](ruta) o ![texto](ruta): copialas tal cual, en el mismo lugar, sin traducir ni cambiar nada.
 - "mensajes" es el hilo de respuestas y contrapreguntas: traduce el "texto" de cada uno y devuelve el mismo "id", en el mismo orden.`;
 
 export async function traducirPregunta(p: Pregunta, idioma: IdiomaVista): Promise<TraduccionPregunta> {
