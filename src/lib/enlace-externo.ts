@@ -11,9 +11,20 @@ export function tokenValido(token: string): boolean {
   return /^[A-Za-z0-9_-]{40,60}$/.test(token);
 }
 
+/** Pregunta duena del token. Si (por datos copiados o migrados) dos preguntas compartieran
+ * token, el enlace no se resuelve: nunca se muestra una pregunta que no es la del enlace. */
 export function preguntaPorToken(db: Db, token: string): Pregunta | null {
   if (!tokenValido(token)) return null;
-  return db.preguntas.find((p) => p.enlaceExterno?.token === token) ?? null;
+  const duenas = db.preguntas.filter((p) => p.enlaceExterno?.token === token);
+  return duenas.length === 1 ? duenas[0] : null;
+}
+
+/** Token nuevo que ninguna otra pregunta usa. */
+export function tokenEnlaceUnico(db: Db): string {
+  const usados = new Set(db.preguntas.map((p) => p.enlaceExterno?.token).filter(Boolean));
+  let token = nuevoTokenEnlace();
+  while (usados.has(token)) token = nuevoTokenEnlace();
+  return token;
 }
 
 /**
