@@ -1,9 +1,13 @@
 import Link from "next/link";
-import { getMarcas } from "@/lib/queries";
+import { getConsolidadoGarantias, getMarcas } from "@/lib/queries";
 import NuevaMarcaForm from "./nueva-marca-form";
+import ListaGarantias from "../lista-garantias";
+import ResumenGarantias from "../consolidado-garantias";
 
 export default async function HomePage() {
-  const marcas = await getMarcas();
+  const [marcas, garantias] = await Promise.all([getMarcas(), getConsolidadoGarantias({ soloAbiertas: true })]);
+  // Las abiertas que mas tiempo llevan, primero.
+  const masAntiguas = [...garantias.tickets].sort((a, b) => b.diasAbierta - a.diasAbierta).slice(0, 8);
 
   return (
     <div className="flex flex-col gap-6">
@@ -46,6 +50,25 @@ export default async function HomePage() {
           ))}
         </div>
       )}
+
+      <section className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-semibold">Garantías</h2>
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">Consolidado de solicitudes de garantía de todas las marcas.</p>
+          </div>
+          <Link href="/garantias" className="text-sm text-sky-700 underline hover:text-sky-900 dark:text-sky-400">
+            Ver consolidado completo →
+          </Link>
+        </div>
+        <ResumenGarantias porMarca={garantias.porMarca} />
+        {masAntiguas.length > 0 && (
+          <>
+            <p className="text-sm font-medium">Abiertas con más días</p>
+            <ListaGarantias garantias={masAntiguas} conMarca vacio="" />
+          </>
+        )}
+      </section>
 
       <div className="max-w-md">
         <NuevaMarcaForm />

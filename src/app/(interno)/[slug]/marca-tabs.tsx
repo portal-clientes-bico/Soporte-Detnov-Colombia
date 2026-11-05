@@ -11,6 +11,7 @@ export default function MarcaTabs({ slug }: { slug: string }) {
     { href: `${base}/tareas`, label: "Tareas" },
     { href: `${base}/preguntas`, label: "Preguntas" },
     { href: `${base}/instructivos`, label: "Instructivos y Diagnóstico de Fallas" },
+    { href: `${base}/garantias`, label: "Garantías" },
     { href: `${base}/productos`, label: "Productos" },
     { href: `${base}/documentos`, label: "Documentos" },
     { href: `${base}/traducciones`, label: "Traducciones" },

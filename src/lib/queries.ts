@@ -3,17 +3,21 @@ import { leerDb } from "@/lib/db";
 import { leerTextoDocumento } from "@/lib/extraccion-texto";
 import { leerEmbeddingsDocumento } from "@/lib/embeddings";
 import { mensajesDe } from "@/lib/hilo";
+import { diasEntre } from "@/lib/garantias";
+import { GARANTIA_ESTADOS_ABIERTOS } from "@/lib/tipos";
 import type {
   Compatibilidad,
   Documento,
   Fuente,
   Db,
+  Garantia,
   Hallazgo,
   Instructivo,
   Marca,
   Producto,
   SoporteConfianza,
   SoporteDocumentoTipo,
+  SoporteGarantiaEstado,
   SoporteHallazgoEstado,
   SoporteHallazgoTipo,
   SoporteIdioma,
@@ -575,3 +579,115 @@ export async function getTareasDeMarca(marcaId: string, filtro: FiltroTareas = {
 }
 
 export type { Compatibilidad };
+
+export interface FiltroGarantias {
+  estado?: SoporteGarantiaEstado;
+  /** "ABIERTAS" = cualquier estado pendiente (todo menos Rechazada y Cerrada). */
+  soloAbiertas?: boolean;
+  prioridad?: SoporteTareaPrioridad;
+  productoId?: string;
+  asignadoAUsuarioId?: string;
+  /** Busca en numero, titulo, cliente, proyecto, RMA, serial y referencia. */
+  texto?: string;
+}
+
+const ORDEN_ESTADO_GARANTIA: Record<string, number> = {
+  INFO_SOLICITADA: 0,
+  BORRADOR: 1,
+  ENVIADA: 2,
+  EN_REVISION: 3,
+  APROBADA: 4,
+  RECHAZADA: 5,
+  CERRADA: 6,
+};
+
+function normalizarBusqueda(t: string): string {
+  return t
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+}
+
+/** Ticket con los nombres que necesita la vista (usuario asignado, marca) y los dias abierto. */
+function enriquecerGarantia(db: Db, g: Garantia, hoy: Date) {
+  const nombreUsuario = (id: string | null | undefined) => (id ? (db.usuarios.find((u) => u.id === id)?.nombre ?? null) : null);
+  const marca = db.marcas.find((m) => m.id === g.marcaId);
+  const abierta = GARANTIA_ESTADOS_ABIERTOS.includes(g.estado);
+  return {
+    ...g,
+    marcaNombre: marca?.nombre ?? "",
+    marcaSlug: marca?.slug ?? "",
+    asignadoANombre: nombreUsuario(g.asignadoAUsuarioId),
+    creadoPorNombre: nombreUsuario(g.creadoPorUsuarioId),
+    unidades: g.items.reduce((n, i) => n + (i.cantidad || 1), 0),
+    abierta,
+    /** Dias desde que se creo hasta hoy (abierta) o hasta que se cerro/rechazo. */
+    diasAbierta: diasEntre(g.createdAt, abierta ? hoy : new Date(g.cerradaEn ?? g.resueltaEn ?? g.updatedAt)),
+    /** Dias esperando al fabricante desde el envio (solo mientras no ha respondido). */
+    diasEnFabricante: g.enviadaEn && !g.resueltaEn && abierta ? diasEntre(g.enviadaEn, hoy) : null,
+  };
+}
+
+function filtrarGarantias(lista: Garantia[], filtro: FiltroGarantias): Garantia[] {
+  const texto = filtro.texto ? normalizarBusqueda(filtro.texto.trim()) : "";
+  return lista
+    .filter((g) => !filtro.estado || g.estado === filtro.estado)
+    .filter((g) => !filtro.soloAbiertas || GARANTIA_ESTADOS_ABIERTOS.includes(g.estado))
+    .filter((g) => !filtro.prioridad || g.prioridad === filtro.prioridad)
+    .filter((g) => !filtro.productoId || g.items.some((i) => i.productoId === filtro.productoId))
+    .filter((g) => !filtro.asignadoAUsuarioId || g.asignadoAUsuarioId === filtro.asignadoAUsuarioId)
+    .filter((g) => {
+      if (!texto) return true;
+      const campos = [g.numero, g.titulo, g.clienteNombre, g.clienteNit, g.proyecto, g.rmaFabricante, g.facturaVenta, ...g.items.flatMap((i) => [i.serial, i.referencia, i.lote])];
+      return campos.some((c) => c && normalizarBusqueda(c).includes(texto));
+    });
+}
+
+function ordenarGarantias<T extends Garantia>(lista: T[]): T[] {
+  return lista.sort(
+    (a, b) =>
+      (ORDEN_ESTADO_GARANTIA[a.estado] ?? 9) - (ORDEN_ESTADO_GARANTIA[b.estado] ?? 9) ||
+      (ORDEN_PRIORIDAD[a.prioridad] ?? 9) - (ORDEN_PRIORIDAD[b.prioridad] ?? 9) ||
+      a.createdAt.localeCompare(b.createdAt),
+  );
+}
+
+export async function getGarantiasDeMarca(marcaId: string, filtro: FiltroGarantias = {}) {
+  const db = await leerDb();
+  const hoy = new Date();
+  return ordenarGarantias(filtrarGarantias(db.garantias.filter((g) => g.marcaId === marcaId), filtro).map((g) => enriquecerGarantia(db, g, hoy)));
+}
+
+export async function getGarantia(marcaId: string, id: string) {
+  const db = await leerDb();
+  const g = db.garantias.find((x) => x.id === id && x.marcaId === marcaId);
+  return g ? enriquecerGarantia(db, g, new Date()) : null;
+}
+
+/** Consolidado de todas las marcas para la pagina central: conteos por marca y estado, y los
+ * tickets que cumplan el filtro (por defecto, los abiertos). */
+export async function getConsolidadoGarantias(filtro: FiltroGarantias & { marcaId?: string } = {}) {
+  const db = await leerDb();
+  const hoy = new Date();
+  const porMarca = db.marcas
+    .map((m) => {
+      const delaMarca = db.garantias.filter((g) => g.marcaId === m.id);
+      const porEstado = Object.fromEntries(delaMarca.reduce((acc, g) => acc.set(g.estado, (acc.get(g.estado) ?? 0) + 1), new Map<string, number>()));
+      const abiertas = delaMarca.filter((g) => GARANTIA_ESTADOS_ABIERTOS.includes(g.estado));
+      return {
+        marcaId: m.id,
+        marcaNombre: m.nombre,
+        marcaSlug: m.slug,
+        total: delaMarca.length,
+        abiertas: abiertas.length,
+        porEstado: porEstado as Partial<Record<SoporteGarantiaEstado, number>>,
+        /** Dias del ticket abierto mas antiguo. */
+        masAntigua: abiertas.reduce((max, g) => Math.max(max, diasEntre(g.createdAt, hoy)), 0),
+      };
+    })
+    .filter((m) => m.total > 0)
+    .sort((a, b) => b.abiertas - a.abiertas || a.marcaNombre.localeCompare(b.marcaNombre));
+  const base = filtro.marcaId ? db.garantias.filter((g) => g.marcaId === filtro.marcaId) : db.garantias;
+  const tickets = ordenarGarantias(filtrarGarantias(base, filtro).map((g) => enriquecerGarantia(db, g, hoy)));
+  return { porMarca, tickets };
+}

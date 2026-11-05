@@ -6,6 +6,8 @@ import {
   ESTADO_TRADUCCION_VALUES,
   FAMILIA_PRODUCTO_VALUES,
   FUENTE_TIPO_VALUES,
+  GARANTIA_ESTADO_VALUES,
+  GARANTIA_RESOLUCION_VALUES,
   HALLAZGO_ESTADO_VALUES,
   HALLAZGO_TIPO_VALUES,
   IDIOMA_VALUES,
@@ -234,6 +236,60 @@ export const tareaSchema = tareaCamposSchema.extend({
 export const tareaPatchSchema = tareaCamposSchema.partial().extend({
   estado: z.enum(TAREA_ESTADO_VALUES).optional(),
 });
+
+const fechaDiaOpcional = z
+  .string()
+  .optional()
+  .transform((v) => (v ? v : null))
+  .refine((v) => v === null || /^\d{4}-\d{2}-\d{2}$/.test(v), "Fecha invalida (AAAA-MM-DD)");
+
+export const itemGarantiaSchema = z.object({
+  id: z.string().trim().max(60).optional(),
+  productoId: textoOpcional(60),
+  referencia: z.string().trim().min(1, "Indica la referencia de cada unidad").max(120),
+  serial: z.string().trim().min(1, "Indica el serial de cada unidad").max(120),
+  cantidad: z.coerce.number().int().min(1).max(10000).default(1),
+  lote: textoOpcional(120),
+  falla: textoOpcional(1000),
+});
+
+/** Campos editables del ticket (el estado cambia por /eventos, que deja rastro en la bitacora). */
+export const garantiaCamposSchema = z.object({
+  titulo: z.string().trim().min(3).max(250),
+  prioridad: z.enum(TAREA_PRIORIDAD_VALUES),
+  clienteNombre: z.string().trim().min(2, "Indica el cliente").max(200),
+  clienteNit: textoOpcional(60),
+  clienteContacto: textoOpcional(200),
+  clienteTelefono: textoOpcional(60),
+  clienteEmail: textoOpcional(200),
+  clienteCiudad: textoOpcional(120),
+  proyecto: textoOpcional(250),
+  facturaVenta: textoOpcional(120),
+  fechaCompra: fechaDiaOpcional,
+  fechaInstalacion: fechaDiaOpcional,
+  items: z.array(itemGarantiaSchema).min(1, "Agrega al menos un producto con su serial").max(500),
+  descripcionFalla: z.string().trim().min(3, "Describe la condicion de falla").max(50000),
+  diagnostico: textoOpcional(50000),
+  rmaFabricante: textoOpcional(120),
+  guiaEnvio: textoOpcional(250),
+  resolucion: z.enum(GARANTIA_RESOLUCION_VALUES).nullish().transform((v) => v ?? null),
+  resolucionNotas: textoOpcional(50000),
+  asignadoAUsuarioId: textoOpcional(60),
+});
+
+export const garantiaSchema = garantiaCamposSchema.extend({
+  marcaId: z.string().min(1),
+});
+
+export const garantiaPatchSchema = garantiaCamposSchema.partial();
+
+/** Cambio de estado y/o comentario en la bitacora. */
+export const eventoGarantiaSchema = z
+  .object({
+    estado: z.enum(GARANTIA_ESTADO_VALUES).optional(),
+    texto: z.string().trim().max(50000).default(""),
+  })
+  .refine((v) => !!v.estado || v.texto.length > 0, "Escribe un comentario o elige un estado");
 
 const idiomaOpcional = z.enum(["es", "en", "zh"]).optional();
 

@@ -39,6 +39,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     }
     db.instructivos = db.instructivos.filter((i) => i.marcaId !== marca.id);
     db.tareas = db.tareas.filter((t) => t.marcaId !== marca.id);
+    db.garantias = db.garantias.filter((g) => g.marcaId !== marca.id);
 
     db.documentos = db.documentos.filter((d) => d.marcaId !== marca.id);
     const productoIds = new Set(db.productos.filter((p) => p.marcaId === marca.id).map((p) => p.id));
