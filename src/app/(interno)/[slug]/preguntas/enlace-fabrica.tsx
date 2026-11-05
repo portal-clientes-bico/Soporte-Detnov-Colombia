@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { EnlaceExterno, IdiomaVista } from "@/lib/db";
+import type { EnlaceExterno, IdiomaVista, SoportePreguntaEstado } from "@/lib/db";
 import { IDIOMAS, IDIOMA_VALUES } from "@/lib/idioma";
 import BanderaIdioma from "../../../bandera-idioma";
 
@@ -10,8 +10,23 @@ import BanderaIdioma from "../../../bandera-idioma";
  * Enlace de la pregunta para funcionarios de la fabrica: entran sin usuario ni contraseña a
  * /responder/<token>, ven la pregunta en su idioma y pueden responder y adjuntar documentos.
  * Se copia en el idioma que se quiera (?lang=), se comparte por WhatsApp o se revoca.
+ *
+ * Copiar, Abrir y WhatsApp no arman la direccion con lo que tenga pintado la pagina: piden al
+ * servidor el enlace vigente de ESTA pregunta (por su id) en el momento del clic, asi nunca se
+ * entrega un token viejo o de otra tarjeta. Si la pregunta sigue en Borrador, ofrece publicarla
+ * antes, porque la fabrica no puede ver borradores.
  */
-export default function EnlaceFabrica({ preguntaId, titulo, enlace }: { preguntaId: string; titulo: string; enlace: EnlaceExterno | null | undefined }) {
+export default function EnlaceFabrica({
+  preguntaId,
+  titulo,
+  estado,
+  enlace,
+}: {
+  preguntaId: string;
+  titulo: string;
+  estado: SoportePreguntaEstado;
+  enlace: EnlaceExterno | null | undefined;
+}) {
   const router = useRouter();
   const [origen, setOrigen] = useState("");
   const [loading, setLoading] = useState(false);
@@ -20,7 +35,44 @@ export default function EnlaceFabrica({ preguntaId, titulo, enlace }: { pregunta
 
   useEffect(() => setOrigen(window.location.origin), []);
 
-  const url = (idioma: IdiomaVista) => (enlace ? `${origen}/responder/${enlace.token}?lang=${idioma}` : "");
+  function armarUrl(token: string, idioma: IdiomaVista): string {
+    const u = new URL(`/responder/${encodeURIComponent(token)}`, window.location.origin);
+    u.searchParams.set("lang", idioma);
+    return u.toString();
+  }
+
+  /** Direccion vigente del enlace de esta pregunta, confirmada con el servidor (null = no se
+   * pudo o se cancelo; el motivo queda en error). */
+  async function urlVigente(idioma: IdiomaVista): Promise<string | null> {
+    setError(null);
+    const res = await fetch(`/api/preguntas/${encodeURIComponent(preguntaId)}/enlace`, { cache: "no-store" }).catch(() => null);
+    const data = (await res?.json().catch(() => null)) ?? null;
+    if (!res?.ok || data?.preguntaId !== preguntaId) {
+      setError("No se pudo leer el enlace de esta pregunta. Recarga la página e intenta de nuevo.");
+      return null;
+    }
+    const token: string | undefined = data.enlace?.token;
+    if (!token) {
+      setError("Esta pregunta ya no tiene enlace (fue revocado). Genera uno nuevo.");
+      router.refresh();
+      return null;
+    }
+    if (token !== enlace?.token) router.refresh(); // la pagina estaba desactualizada
+    if (data.estado === "BORRADOR") {
+      if (!confirm("Esta pregunta está en Borrador: la fábrica no podrá verla. ¿Publicarla ahora?")) return null;
+      const pub = await fetch(`/api/preguntas/${encodeURIComponent(preguntaId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estado: "ABIERTA" }),
+      }).catch(() => null);
+      if (!pub?.ok) {
+        setError("No se pudo publicar la pregunta.");
+        return null;
+      }
+      router.refresh();
+    }
+    return armarUrl(token, idioma);
+  }
 
   async function generar() {
     if (enlace && !confirm("¿Generar un enlace nuevo? El enlace anterior dejará de funcionar.")) return;
@@ -43,13 +95,42 @@ export default function EnlaceFabrica({ preguntaId, titulo, enlace }: { pregunta
   }
 
   async function copiar(idioma: IdiomaVista) {
+    const pendiente = urlVigente(idioma);
     try {
-      await navigator.clipboard.writeText(url(idioma));
+      if (typeof ClipboardItem !== "undefined" && navigator.clipboard.write) {
+        // Se entrega al portapapeles una promesa: asi Safari no rechaza la copia por haber
+        // esperado la respuesta del servidor despues del clic.
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            "text/plain": pendiente.then((url) => {
+              if (!url) throw new Error("sin enlace");
+              return new Blob([url], { type: "text/plain" });
+            }),
+          }),
+        ]);
+      } else {
+        const url = await pendiente;
+        if (!url) return;
+        await navigator.clipboard.writeText(url);
+      }
       setCopiado(idioma);
       setTimeout(() => setCopiado(null), 2000);
     } catch {
-      setError("No se pudo copiar; abre el enlace y copia la dirección del navegador.");
+      // Si fallo por no haber enlace, urlVigente ya dejo el motivo en error.
+      if (await pendiente) setError("No se pudo copiar; usa Abrir y copia la dirección del navegador.");
     }
+  }
+
+  /** Abre una pestana al instante (si se abre despues de esperar al servidor, el navegador la
+   * bloquea) y la lleva a la direccion confirmada. */
+  async function abrirEn(destino: (url: string) => string, idioma: IdiomaVista) {
+    const ventana = window.open("about:blank", "_blank");
+    const url = await urlVigente(idioma);
+    if (!url) return void ventana?.close();
+    if (ventana) {
+      ventana.opener = null;
+      ventana.location.href = destino(url);
+    } else window.location.href = destino(url);
   }
 
   if (!enlace) {
@@ -69,6 +150,13 @@ export default function EnlaceFabrica({ preguntaId, titulo, enlace }: { pregunta
       <p className="text-zinc-600 dark:text-zinc-400">
         Quien tenga el enlace puede ver la pregunta, responderla y adjuntar documentos. Copia el enlace en el idioma de quien lo recibe.
       </p>
+      {estado !== "ABIERTA" && (
+        <p className="rounded-md bg-amber-100 px-2 py-1 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
+          {estado === "BORRADOR"
+            ? "Esta pregunta está en Borrador: quien abra el enlace no podrá verla hasta que la publiques."
+            : "Esta pregunta está Cerrada: el enlace la muestra, pero ya no se puede responder."}
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         {IDIOMA_VALUES.map((i) => (
           <button
@@ -82,17 +170,17 @@ export default function EnlaceFabrica({ preguntaId, titulo, enlace }: { pregunta
             {copiado === i ? "¡Copiado!" : `Copiar (${IDIOMAS[i].corto})`}
           </button>
         ))}
-        <a
-          href={origen ? `https://wa.me/?text=${encodeURIComponent(`${titulo}\n${url("en")}`)}` : "#"}
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          type="button"
+          onClick={() => abrirEn((url) => `https://wa.me/?text=${encodeURIComponent(`${titulo}\n${url}`)}`, "en")}
+          disabled={!origen}
           className="rounded-full bg-[#25D366] px-2.5 py-0.5 font-medium text-white hover:bg-[#1ebe5b]"
         >
           WhatsApp
-        </a>
-        <a href={origen ? url("es") : "#"} target="_blank" rel="noopener noreferrer" className="text-zinc-500 underline hover:text-zinc-900 dark:hover:text-zinc-50">
+        </button>
+        <button type="button" onClick={() => abrirEn((url) => url, "es")} disabled={!origen} className="text-zinc-500 underline hover:text-zinc-900 dark:hover:text-zinc-50">
           Abrir
-        </a>
+        </button>
       </div>
       <div className="flex flex-wrap items-center gap-3 text-zinc-500 dark:text-zinc-400">
         <span>

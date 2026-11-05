@@ -38,6 +38,7 @@ export const TEXTOS_EXTERNO = {
     error: "No se pudo completar la acción",
     noValido: "Este enlace no es válido o fue revocado.",
     sinAbiertas: "No hay preguntas abiertas en este momento. ¡Gracias por su ayuda!",
+    noDisponible: "Esta pregunta aún no está disponible. Intente más tarde.",
     editor: {
       enlace: "🔗 Insertar enlace",
       pideUrl: "Dirección del enlace (https://...)",
@@ -86,6 +87,7 @@ export const TEXTOS_EXTERNO = {
     error: "The action could not be completed",
     noValido: "This link is not valid or has been revoked.",
     sinAbiertas: "There are no open questions at the moment. Thank you for your help!",
+    noDisponible: "This question is not available yet. Please try again later.",
     editor: {
       enlace: "🔗 Insert link",
       pideUrl: "Link address (https://...)",
@@ -134,6 +136,7 @@ export const TEXTOS_EXTERNO = {
     error: "操作未能完成",
     noValido: "此链接无效或已被撤销。",
     sinAbiertas: "目前没有待处理的问题。感谢您的帮助！",
+    noDisponible: "此问题暂不可用，请稍后再试。",
     editor: {
       enlace: "🔗 插入链接",
       pideUrl: "链接地址 (https://...)",
