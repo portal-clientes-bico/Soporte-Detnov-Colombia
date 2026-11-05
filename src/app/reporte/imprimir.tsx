@@ -49,7 +49,7 @@ export default function Imprimir({ total, volver }: { total: number; volver: str
       </button>
       <span className="text-zinc-600">En el cuadro de imprimir elige «Guardar como PDF» como destino. Los enlaces quedan activos en el PDF.</span>
       <a href={volver} className="ml-auto text-zinc-500 underline hover:text-zinc-900">
-        Volver a Preguntas
+        Volver
       </a>
     </div>
   );

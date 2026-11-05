@@ -9,7 +9,7 @@ import { DOCUMENTO_TIPOS, ORGANIZACIONES, PREGUNTA_ESTADOS, PREGUNTA_ESTADO_VALU
 import type { IdiomaVista, SoportePreguntaEstado, SoportePreguntaPrioridad, TraduccionPregunta } from "@/lib/db";
 import HiloMensajes from "../../../hilo-mensajes";
 import TextoEnriquecido from "../../../texto-enriquecido";
-import Imprimir from "./imprimir";
+import Imprimir from "../../imprimir";
 
 // La primera vez que se pide, traduce al ingles y al chino las preguntas que no tengan
 // traduccion guardada (las siguientes veces ya no).

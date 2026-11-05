@@ -3,6 +3,8 @@ import type {
   SoporteDocumentoTipo,
   SoporteEstadoTraduccion,
   SoporteFuenteTipo,
+  SoporteGarantiaEstado,
+  SoporteGarantiaResolucion,
   SoporteHallazgoEstado,
   SoporteHallazgoTipo,
   SoporteIdioma,
@@ -293,6 +295,32 @@ export const TAREA_ESTADOS: Record<SoporteTareaEstado, string> = {
 };
 
 export const TAREA_ESTADO_VALUES = Object.keys(TAREA_ESTADOS) as SoporteTareaEstado[];
+
+export const GARANTIA_ESTADOS: Record<SoporteGarantiaEstado, string> = {
+  BORRADOR: "Borrador",
+  ENVIADA: "Enviada al fabricante",
+  EN_REVISION: "En revisión del fabricante",
+  INFO_SOLICITADA: "Información solicitada",
+  APROBADA: "Aprobada",
+  RECHAZADA: "Rechazada",
+  CERRADA: "Cerrada",
+};
+
+export const GARANTIA_ESTADO_VALUES = Object.keys(GARANTIA_ESTADOS) as SoporteGarantiaEstado[];
+
+/** Estados en los que el ticket sigue pendiente (para conteos y el consolidado). */
+export const GARANTIA_ESTADOS_ABIERTOS: SoporteGarantiaEstado[] = ["BORRADOR", "ENVIADA", "EN_REVISION", "INFO_SOLICITADA", "APROBADA"];
+
+export const GARANTIA_RESOLUCIONES: Record<SoporteGarantiaResolucion, string> = {
+  REEMPLAZO: "Reemplazo de la unidad",
+  REPARACION: "Reparación",
+  NOTA_CREDITO: "Nota crédito",
+  SIN_FALLA: "Sin falla encontrada",
+  FUERA_DE_GARANTIA: "Fuera de garantía",
+  OTRA: "Otra",
+};
+
+export const GARANTIA_RESOLUCION_VALUES = Object.keys(GARANTIA_RESOLUCIONES) as SoporteGarantiaResolucion[];
 
 /** Imagenes aceptadas dentro de un instructivo (subconjunto de ARCHIVO_TIPOS_PERMITIDOS). */
 export const IMAGEN_TIPOS_PERMITIDOS = ["image/png", "image/jpeg", "image/webp"];

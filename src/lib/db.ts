@@ -74,6 +74,12 @@ export type SoporteInstructivoEstado = "EN_ELABORACION" | "PUBLICADO";
 export type SoporteTareaPrioridad = "ALTA" | "MEDIA" | "BAJA";
 export type SoporteTareaEstado = "PENDIENTE" | "EN_PROGRESO" | "COMPLETADA";
 
+/** Flujo de un ticket de garantia: se arma (Borrador), se envia al fabricante, el fabricante lo
+ * revisa (y puede pedir mas informacion), lo aprueba o rechaza, y se cierra cuando el cliente
+ * recibe la solucion. */
+export type SoporteGarantiaEstado = "BORRADOR" | "ENVIADA" | "EN_REVISION" | "INFO_SOLICITADA" | "APROBADA" | "RECHAZADA" | "CERRADA";
+export type SoporteGarantiaResolucion = "REEMPLAZO" | "REPARACION" | "NOTA_CREDITO" | "SIN_FALLA" | "FUERA_DE_GARANTIA" | "OTRA";
+
 export interface Especificacion {
   grupo: string;
   nombre: string;
@@ -312,6 +318,77 @@ export interface Tarea {
   updatedAt: string;
 }
 
+/** Una unidad reclamada en un ticket de garantia. */
+export interface ItemGarantia {
+  id: string;
+  /** Producto del catalogo de la marca, si esta registrado. */
+  productoId: string | null;
+  /** Referencia tal como se reporta (se guarda aunque el producto no este en el catalogo). */
+  referencia: string;
+  serial: string;
+  cantidad: number;
+  /** Lote o fecha de fabricacion impresa en la unidad, si se conoce. */
+  lote: string | null;
+  /** Falla puntual de esta unidad (la descripcion general va en el ticket). */
+  falla: string | null;
+}
+
+/** Entrada de la bitacora del ticket: cambio de estado (con su comentario) o comentario suelto. */
+export interface EventoGarantia {
+  id: string;
+  fecha: string;
+  autor: string;
+  tipo: "ESTADO" | "COMENTARIO";
+  estadoAnterior: SoporteGarantiaEstado | null;
+  estadoNuevo: SoporteGarantiaEstado | null;
+  /** Texto enriquecido (ver src/lib/texto-enriquecido.ts); puede ir vacio en un cambio de estado. */
+  texto: string;
+}
+
+/** Ticket de garantia para trasladar al fabricante (pestana "Garantias" de cada marca). */
+export interface Garantia {
+  id: string;
+  marcaId: string;
+  /** Consecutivo legible, unico en toda la herramienta: GAR-AAAA-0001. */
+  numero: string;
+  titulo: string;
+  estado: SoporteGarantiaEstado;
+  prioridad: SoporteTareaPrioridad;
+  clienteNombre: string;
+  clienteNit: string | null;
+  clienteContacto: string | null;
+  clienteTelefono: string | null;
+  clienteEmail: string | null;
+  clienteCiudad: string | null;
+  /** Obra o proyecto donde esta instalado el equipo. */
+  proyecto: string | null;
+  facturaVenta: string | null;
+  /** "AAAA-MM-DD" */
+  fechaCompra: string | null;
+  fechaInstalacion: string | null;
+  items: ItemGarantia[];
+  /** Condicion de falla, en texto enriquecido (imagenes y enlaces a videos). */
+  descripcionFalla: string;
+  /** Pruebas y diagnostico hechos antes de escalar al fabricante (texto enriquecido). */
+  diagnostico: string | null;
+  /** Numero de RMA / caso que asigna el fabricante. */
+  rmaFabricante: string | null;
+  /** Cuando paso por primera vez a ENVIADA. */
+  enviadaEn: string | null;
+  /** Transportadora y guia del envio de las unidades al fabricante (o del reemplazo). */
+  guiaEnvio: string | null;
+  resolucion: SoporteGarantiaResolucion | null;
+  resolucionNotas: string | null;
+  /** Cuando el fabricante aprobo o rechazo. */
+  resueltaEn: string | null;
+  cerradaEn: string | null;
+  asignadoAUsuarioId: string | null;
+  creadoPorUsuarioId: string | null;
+  eventos: EventoGarantia[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Usuario {
   id: string;
   nombre: string;
@@ -378,6 +455,7 @@ export interface Db {
   historialChatbot: ConsultaChatbot[];
   instructivos: Instructivo[];
   tareas: Tarea[];
+  garantias: Garantia[];
 }
 
 function dbVacia(): Db {
@@ -397,6 +475,7 @@ function dbVacia(): Db {
     historialChatbot: [],
     instructivos: [],
     tareas: [],
+    garantias: [],
   };
 }
 
@@ -428,6 +507,7 @@ function normalizarDb(parcial: Partial<Db>): Db {
     historialChatbot: parcial.historialChatbot ?? vacia.historialChatbot,
     instructivos: parcial.instructivos ?? vacia.instructivos,
     tareas: parcial.tareas ?? vacia.tareas,
+    garantias: parcial.garantias ?? vacia.garantias,
   };
 }
 
