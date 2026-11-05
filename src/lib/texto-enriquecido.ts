@@ -54,14 +54,6 @@ export function fragmentarTexto(texto: string): FragmentoTexto[] {
   return fragmentos;
 }
 
-/** Version para documentos sin hipervinculos (reporte en Word): "texto (url)"; las imagenes
- * quedan como "[imagen]". */
-export function aTextoPlano(texto: string): string {
-  return fragmentarTexto(texto)
-    .map((f) => (f.tipo === "imagen" ? "[imagen]" : f.tipo === "enlace" && f.texto !== f.url ? `${f.texto} (${f.url})` : f.texto))
-    .join("");
-}
-
 /** Enlace en el formato guardado; los corchetes del texto se cambian para no romperlo. */
 export function enlaceMarkdown(texto: string, url: string): string {
   return `[${texto.replace(/[[\]\n]/g, " ").trim() || url}](${url})`;

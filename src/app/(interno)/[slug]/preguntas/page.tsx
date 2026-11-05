@@ -101,10 +101,20 @@ export default async function PreguntasPage({
         </form>
         <div className="flex items-center gap-3">
           <a
-            href={`/api/marcas/${slug}/preguntas/reporte`}
+            href={`/reporte/${slug}/preguntas${(() => {
+              // Mismos filtros que la lista: el reporte trae exactamente las preguntas que se ven.
+              const qs = new URLSearchParams();
+              if (prioridadFiltro) qs.set("prioridad", prioridadFiltro);
+              if (estadoFiltro) qs.set("estado", estadoFiltro);
+              if (asignadoFiltro) qs.set("asignadoAUsuarioId", asignadoFiltro);
+              if (sp.referencia) qs.set("referencia", sp.referencia);
+              return qs.size ? `?${qs}` : "";
+            })()}`}
+            target="_blank"
+            rel="noopener"
             className="rounded-full border border-zinc-300 px-4 py-2 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
           >
-            Descargar reporte (Word)
+            Generar reporte (PDF)
           </a>
           <NuevaPreguntaForm marcaId={marca.id} referencias={referencias} usuarios={usuarios} documentos={documentos} />
         </div>
