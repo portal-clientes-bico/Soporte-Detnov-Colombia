@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getMarcaPorSlug, getPreguntasDeMarca } from "@/lib/queries";
 import { sesionActual } from "@/lib/sesion-actual";
@@ -64,6 +65,10 @@ export default async function ReportePreguntasPage({ params, searchParams }: { p
   const traducciones = new Map<IdiomaVista, Map<string, TraduccionPregunta>>();
   for (const idioma of IDIOMA_VALUES) traducciones.set(idioma, await asegurarTraducciones(preguntas, idioma, preguntas.length));
 
+  // Direccion absoluta del sitio, para que los enlaces del PDF funcionen fuera de la herramienta.
+  const h = await headers();
+  const origen = `${h.get("x-forwarded-proto") ?? "http"}://${h.get("x-forwarded-host") ?? h.get("host")}`;
+
   const asignado = filtros.asignadoAUsuarioId ? preguntas.find((p) => p.asignadoAUsuarioId === filtros.asignadoAUsuarioId)?.asignadoNombre : null;
   const filtrosTexto = [
     filtros.estado && `Estado: ${PREGUNTA_ESTADOS[filtros.estado]}`,
@@ -104,7 +109,7 @@ export default async function ReportePreguntasPage({ params, searchParams }: { p
                   </h3>
                   <div className="flex flex-col gap-6">
                     {items.map((p) => (
-                      <BloquePregunta key={p.id} p={p} traducciones={traducciones} />
+                      <BloquePregunta key={p.id} p={p} traducciones={traducciones} origen={origen} />
                     ))}
                   </div>
                 </div>
@@ -117,7 +122,22 @@ export default async function ReportePreguntasPage({ params, searchParams }: { p
   );
 }
 
-function BloquePregunta({ p, traducciones }: { p: Pregunta; traducciones: Map<IdiomaVista, Map<string, TraduccionPregunta>> }) {
+/** Enlace publico de la pregunta (el de la fabrica, /responder/<token>) en el idioma pedido;
+ * null si la pregunta no tiene enlace generado. */
+function enlacePublico(p: Pregunta, origen: string, idioma: IdiomaVista): string | null {
+  return p.enlaceExterno ? `${origen}/responder/${encodeURIComponent(p.enlaceExterno.token)}?lang=${idioma}` : null;
+}
+
+function TituloEnlazado({ texto, url, className }: { texto: string; url: string | null; className: string }) {
+  if (!url) return <span className={className}>{texto}</span>;
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" className={`${className} text-sky-800 underline decoration-sky-300 underline-offset-2`}>
+      {texto}
+    </a>
+  );
+}
+
+function BloquePregunta({ p, traducciones, origen }: { p: Pregunta; traducciones: Map<IdiomaVista, Map<string, TraduccionPregunta>>; origen: string }) {
   const metadata = [
     `Preguntó ${p.autor}`,
     `Creada ${fecha(p.createdAt)}`,
@@ -129,7 +149,21 @@ function BloquePregunta({ p, traducciones }: { p: Pregunta; traducciones: Map<Id
   return (
     <article className="rounded-lg border border-zinc-300 p-4 print:rounded-none print:border-x-0 print:border-b-0 print:px-0">
       <div className="break-inside-avoid">
-        <h4 className="text-lg font-semibold">{p.titulo}</h4>
+        <h4 className="text-lg font-semibold">
+          <TituloEnlazado texto={p.titulo} url={enlacePublico(p, origen, "es")} className="" />
+        </h4>
+        <p className="text-xs text-zinc-500">
+          {p.enlaceExterno ? (
+            <>
+              Sitio público:{" "}
+              <a href={enlacePublico(p, origen, "es")!} target="_blank" rel="noopener noreferrer" className="break-all text-sky-800 underline">
+                {enlacePublico(p, origen, "es")}
+              </a>
+            </>
+          ) : (
+            "Sin enlace público generado"
+          )}
+        </p>
         <p className="mt-0.5 text-xs text-zinc-600">{metadata.join(" · ")}</p>
         {p.productos.length > 0 && (
           <p className="mt-1 text-xs">
@@ -171,7 +205,9 @@ function BloquePregunta({ p, traducciones }: { p: Pregunta; traducciones: Map<Id
               {ETIQUETA_IDIOMA[idioma]} · {idioma.toUpperCase()}
               {sinTraducir && <span className="ml-2 font-normal normal-case text-amber-700">(sin traducción disponible: texto original)</span>}
             </p>
-            <p className="mt-1 font-medium">{t?.titulo ?? p.titulo}</p>
+            <p className="mt-1">
+              <TituloEnlazado texto={t?.titulo ?? p.titulo} url={enlacePublico(p, origen, idioma)} className="font-medium" />
+            </p>
             <TextoEnriquecido texto={t?.contenido ?? p.contenido} className="mt-1 text-sm" />
             <p className="mt-3 mb-1 text-xs font-semibold text-zinc-600">{textos.hiloTitulo}</p>
             <HiloMensajes mensajes={p.mensajes} textos={textos.hilo} traducido={t ? (m) => textoTraducido(t, m) : undefined} locale={locale} />
