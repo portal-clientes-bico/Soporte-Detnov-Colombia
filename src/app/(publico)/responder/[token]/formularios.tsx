@@ -102,7 +102,11 @@ export default function FormulariosExterno({ token, preguntaId, textos }: { toke
             <input type="radio" checked={tipo === "CONTRAPREGUNTA"} onChange={() => setTipo("CONTRAPREGUNTA")} /> {textos.tipoContrapregunta}
           </label>
         </div>
-        <EditorTexto value={respuesta} onChange={setRespuesta} required rows={6} placeholder={textos.respuesta} className={inputClass} textos={textos.editor} />
+        <EditorTexto value={respuesta} onChange={setRespuesta} required rows={6} placeholder={textos.respuesta} className={inputClass}
+          textos={textos.editor}
+          urlSubirImagen={`/api/externo/${encodeURIComponent(token)}/imagenes`}
+          camposSubida={{ preguntaId }}
+        />
         <button type="submit" disabled={enviando !== null} className={botonClass}>
           {enviando === "respuesta" ? textos.enviando : textos.enviar}
         </button>
