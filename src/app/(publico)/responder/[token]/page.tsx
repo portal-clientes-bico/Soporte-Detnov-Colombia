@@ -29,6 +29,22 @@ const PRIORIDAD_BADGE: Record<string, string> = {
   BAJA: "bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200",
 };
 
+/** Dia calendario en Colombia ("AAAA-MM-DD") de una fecha ISO. */
+function diaColombia(fecha: Date): string {
+  return fecha.toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+}
+
+/** Dias calendario transcurridos (hora de Colombia) desde la fecha hasta hoy. */
+function diasDesde(fechaIso: string, hoy: Date): number {
+  const desde = Date.parse(diaColombia(new Date(fechaIso)));
+  const hasta = Date.parse(diaColombia(hoy));
+  return Math.max(0, Math.round((hasta - desde) / 86_400_000));
+}
+
+function textoDias(n: number, t: { hoy: string; haceUnDia: string; haceDias: string }): string {
+  return n === 0 ? t.hoy : n === 1 ? t.haceUnDia : t.haceDias.replace("{n}", String(n));
+}
+
 function href(idioma: IdiomaVista, preguntaId: string | null): string {
   return `?lang=${idioma}${preguntaId ? `&p=${encodeURIComponent(preguntaId)}` : ""}`;
 }
@@ -97,6 +113,10 @@ export default async function ResponderPage({
   const locale = idioma === "zh" ? "zh-CN" : idioma === "en" ? "en-US" : "es-CO";
   const pActual = pregunta.id === base.id ? null : pregunta.id;
   const abiertas = menu.length;
+  const ahora = new Date();
+  // Fecha del ultimo mensaje del hilo (respuesta o contrapregunta) de cada pregunta del menu.
+  const ultimaRespuesta = (x: (typeof menu)[number]) =>
+    mensajesDe(x).reduce<string | null>((max, m) => (!max || m.fecha > max ? m.fecha : max), null);
 
   const listaPreguntas = (
     <div className="flex flex-col gap-4">
@@ -111,7 +131,7 @@ export default async function ResponderPage({
               </span>
               <span>{grupo.length}</span>
             </p>
-            <ul className="flex flex-col gap-1">
+            <ul className="flex flex-col gap-2">
               {grupo.map((x) => {
                 const actual = x.id === pregunta.id;
                 return (
@@ -119,12 +139,24 @@ export default async function ResponderPage({
                     <Link
                       href={href(idioma, x.id === base.id ? null : x.id)}
                       aria-current={actual ? "page" : undefined}
-                      className={`flex items-start justify-between gap-3 rounded-lg px-3 py-2 text-sm ${
-                        actual ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900" : "hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                      className={`flex flex-col gap-1.5 rounded-lg border px-3 py-2 text-sm shadow-sm ${
+                        actual
+                          ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-50 dark:bg-zinc-50 dark:text-zinc-900"
+                          : "border-zinc-200 bg-white hover:border-zinc-400 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-600 dark:hover:bg-zinc-800"
                       }`}
                     >
-                      <span className="min-w-0 line-clamp-2">{tituloDe(x)}</span>
-                      <span className="mt-0.5 shrink-0 text-xs opacity-70">{x.respuesta ? textos.conRespuesta : textos.sinRespuestaCorto}</span>
+                      <span className="line-clamp-2 font-medium">{tituloDe(x)}</span>
+                      <span className="flex flex-col gap-0.5 text-xs opacity-75">
+                        <span>
+                          📅 {textos.tarjetaCreada}: {textoDias(diasDesde(x.createdAt, ahora), textos)}
+                        </span>
+                        <span>
+                          💬 {(() => {
+                            const ultima = ultimaRespuesta(x);
+                            return ultima ? `${textos.tarjetaUltima}: ${textoDias(diasDesde(ultima, ahora), textos)}` : textos.sinRespuestaCorto;
+                          })()}
+                        </span>
+                      </span>
                     </Link>
                   </li>
                 );
